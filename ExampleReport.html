@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отчет системы</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    background-color: #f5f5f5;
+                    padding: 20px;
+                }
+
+                .main-wrapper {
+                    display: flex;
+                    gap: 20px;
+                    max-width: 1400px;
+                    margin: 0 auto;
+                }
+
+                .status-table-container {
+                    flex-shrink: 0;
+                    width: 300px;
+                }
+
+                .status-table-container h2 {
+                    color: #333;
+                    margin-bottom: 15px;
+                    font-size: 1.3em;
+                    text-align: center;
+                }
+
+                .status-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    background: white;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                }
+
+                .status-table th {
+                    background: #4CAF50;
+                    color: white;
+                    padding: 12px;
+                    text-align: left;
+                    font-weight: bold;
+                }
+
+                .status-table td {
+                    padding: 12px;
+                    border-bottom: 1px solid #e0e0e0;
+                }
+
+                .status-table tr.status-green {
+                    background-color: #E8F5E8;
+                }
+
+                .status-table tr.status-red {
+                    background-color: #FFEBEE;
+                }
+
+                .status-table tr.status-yellow {
+                    background-color: #FFF8E1;
+                }
+
+                .status-table tr:hover {
+                    opacity: 0.9;
+                }
+
+                .container {
+                    flex: 1;
+                    max-width: 1200px;
+                }
+
+                h1 {
+                    text-align: center;
+                    color: #333;
+                    margin-bottom: 30px;
+                    font-size: 2.5em;
+                }
+
+                .cards-container {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                    gap: 20px;
+                    margin-bottom: 20px;
+                }
+
+                .card {
+                    background: white;
+                    border-radius: 12px;
+                    padding: 20px;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    border-left: 5px solid;
+                    position: relative;
+                }
+
+                .card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+                }
+
+                .card.green {
+                    border-left-color: #4CAF50;
+                    background: linear-gradient(135deg, #E8F5E8 0%, #F1F8E9 100%);
+                }
+
+                .card.red {
+                    border-left-color: #F44336;
+                    background: linear-gradient(135deg, #FFEBEE 0%, #FCE4EC 100%);
+                }
+
+                .card.yellow {
+                    border-left-color: #FF9800;
+                    background: linear-gradient(135deg, #FFF8E1 0%, #FFF3E0 100%);
+                }
+
+                .card-title {
+                    font-size: 1.4em;
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                    color: #333;
+                }
+
+                .card-content {
+                    color: #666;
+                    font-size: 0.9em;
+                }
+
+                .card.has-children::after {
+                    content: '▶';
+                    position: absolute;
+                    right: 20px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 1.2em;
+                    color: #999;
+                    transition: transform 0.3s ease;
+                }
+
+                .card.expanded::after {
+                    transform: translateY(-50%) rotate(90deg);
+                }
+
+                .sub-cards {
+                    display: none;
+                    margin-top: 15px;
+                    padding-left: 20px;
+                    border-left: 2px solid #e0e0e0;
+                }
+
+                .sub-cards.show {
+                    display: block;
+                }
+
+                .sub-card {
+                    background: #fafafa;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin-bottom: 10px;
+                    border-left: 3px solid;
+                    transition: all 0.3s ease;
+                }
+
+                .sub-card:hover {
+                    background: #f0f0f0;
+                }
+
+                .sub-card.clickable {
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                }
+
+                .sub-card.clickable:hover {
+                    background: #e3f2fd;
+                    transform: translateX(5px);
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+                }
+
+                .sub-card.green {
+                    border-left-color: #4CAF50;
+                }
+
+                .sub-card.red {
+                    border-left-color: #F44336;
+                }
+
+                .sub-card.yellow {
+                    border-left-color: #FF9800;
+                }
+
+                .sub-card-title {
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                    color: #333;
+                }
+
+                .sub-card-value {
+                    color: #666;
+                    font-size: 0.9em;
+                }
+
+                .status-indicator {
+                    display: inline-block;
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    margin-right: 8px;
+                }
+
+                .status-indicator.green {
+                    background-color: #4CAF50;
+                }
+
+                .status-indicator.red {
+                    background-color: #F44336;
+                }
+
+                .status-indicator.yellow {
+                    background-color: #FF9800;
+                }
+
+                .tps-details {
+                    margin-top: 30px;
+                    padding: 20px;
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                }
+
+                .tps-details h2 {
+                    color: #333;
+                    margin-bottom: 20px;
+                    text-align: center;
+                }
+
+                .tps-content {
+                    display: flex;
+                    gap: 30px;
+                    align-items: flex-start;
+                }
+
+                .tps-table-container {
+                    flex: 1;
+                }
+
+                .tps-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    background: white;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                }
+
+                .tps-table th {
+                    background: #4CAF50;
+                    color: white;
+                    padding: 12px;
+                    text-align: left;
+                    font-weight: bold;
+                }
+
+                .tps-table td {
+                    padding: 12px;
+                    border-bottom: 1px solid #e0e0e0;
+                }
+
+                .tps-table tr:nth-child(even) {
+                    background: #f9f9f9;
+                }
+
+                .tps-table tr:hover {
+                    background: #f0f8ff;
+                }
+
+                .tps-chart-container {
+                    flex: 1;
+                    min-width: 400px;
+                }
+
+                .tps-chart-container canvas {
+                    max-width: 100%;
+                    height: auto;
+                }
+
+                @media (max-width: 768px) {
+                    .tps-content {
+                        flex-direction: column;
+                    }
+                    
+                    .tps-chart-container {
+                        min-width: auto;
+                    }
+                }
+
+                .zk-details {
+                    margin-top: 30px;
+                    padding: 20px;
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                }
+
+                .zk-details h2 {
+                    color: #333;
+                    margin-bottom: 20px;
+                    text-align: center;
+                }
+
+                .zk-content {
+                    display: flex;
+                    gap: 30px;
+                    align-items: flex-start;
+                }
+
+                .zk-table-container {
+                    flex: 1;
+                }
+
+                .zk-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    background: white;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                }
+
+                .zk-table th {
+                    background: #4CAF50;
+                    color: white;
+                    padding: 12px;
+                    text-align: left;
+                    font-weight: bold;
+                }
+
+                .zk-table td {
+                    padding: 12px;
+                    border-bottom: 1px solid #e0e0e0;
+                }
+
+                .zk-table tr:nth-child(even) {
+                    background: #f9f9f9;
+                }
+
+                .zk-table tr:hover {
+                    background: #f0f8ff;
+                }
+
+                .zk-table tr.clickable {
+                    cursor: pointer;
+                }
+
+                .zk-table tr.cpu-green {
+                    background-color: #E8F5E8;
+                }
+
+                .zk-table tr.cpu-yellow {
+                    background-color: #FFF8E1;
+                }
+
+                .zk-table tr.cpu-light-yellow {
+                    background-color: #FFFDE7;
+                }
+
+                .zk-table tr.cpu-light-red {
+                    background-color: #FFEBEE;
+                }
+
+                .zk-charts-container {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                }
+
+                .chart-section {
+                    background: #f9f9f9;
+                    padding: 15px;
+                    border-radius: 8px;
+                }
+
+                .chart-section h3 {
+                    margin-bottom: 10px;
+                    color: #333;
+                    text-align: center;
+                }
+
+                .chart-section canvas {
+                    max-width: 100%;
+                    height: auto;
+                }
+
+                @media (max-width: 768px) {
+                    .tps-content, .zk-content {
+                        flex-direction: column;
+                    }
+                    
+                    .tps-chart-container, .zk-charts-container {
+                        min-width: auto;
+                    }
+
+                    .main-wrapper {
+                        flex-direction: column;
+                    }
+
+                    .status-table-container {
+                        width: 100%;
+                    }
+                }
+            </style>
+</head>
+<body>
+    <div class="main-wrapper">
+        <div class="status-table-container">
+            <h2>👤 Кем выдано..</h2>
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Критерий</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="status-green">
+                        <td>Профиль нагрузки</td>
+                        <td>✔️</td>
+                    </tr>
+                    <tr class="status-green">
+                        <td>SLA </td>
+                        <td>✔️</td>
+                    </tr>
+                    <tr class="status-yellow">
+                        <td>КТС</td>
+                        <td>⚠️</td>
+                    </tr>
+                    <tr class="status-red">
+                        <td>Скоуп тестов</td>
+                        <td>❌</td>
+                    </tr>
+                    <tr class="status-green">
+                        <td>Другой критерий</td>
+                        <td>✔️</td>
+                    </tr>
+                    <tr class="status-yellow">
+                        <td>Другой критерий</td>
+                        <td>⚠️</td>
+                    </tr>
+                    <tr class="status-red">
+                        <td>Другой критерий</td>
+                        <td>❌</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="container">
+        <h1>📊 Отчет системы ${Название}</h1>
+        <div class="cards-container">
+            <div class="card green has-children">
+                <div class="card-title">
+                    <span class="status-indicator green"></span>
+                    Transactions
+                </div>
+                <div class="card-content">
+                    3 элементов
+                </div>
+                <div class="sub-cards">
+                <div class="sub-card green">
+                    <div class="sub-card-title">
+                        <span class="status-indicator green"></span>
+                        TPS
+                    </div>
+                    <div class="sub-card-value">
+                        ok
+                    </div>
+                </div>
+                <div class="sub-card green">
+                    <div class="sub-card-title">
+                        <span class="status-indicator green"></span>
+                        RS Time
+                    </div>
+                    <div class="sub-card-value">
+                        ok
+                    </div>
+                </div>
+                <div class="sub-card green">
+                    <div class="sub-card-title">
+                        <span class="status-indicator green"></span>
+                        Errors
+                    </div>
+                    <div class="sub-card-value">
+                        ok
+                    </div>
+                </div>
+                </div>
+            </div>
+            <div class="card green has-children">
+                <div class="card-title">
+                    <span class="status-indicator green"></span>
+                    DropApp
+                </div>
+                <div class="card-content">
+                    2 элементов
+                </div>
+                <div class="sub-cards">
+                <div class="sub-card green has-children">
+                    <div class="sub-card-title">
+                        <span class="status-indicator green"></span>
+                        System Usage
+                    </div>
+                    <div class="sub-card-value">
+                        2 элементов
+                    </div>
+                    <div class="sub-cards">
+                    <div class="sub-card green">
+                        <div class="sub-card-title">
+                            <span class="status-indicator green"></span>
+                            CPU
+                        </div>
+                        <div class="sub-card-value">
+                            ok
+                        </div>
+                    </div>
+                    <div class="sub-card green">
+                        <div class="sub-card-title">
+                            <span class="status-indicator green"></span>
+                            Memory
+                        </div>
+                        <div class="sub-card-value">
+                            ok
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                <div class="sub-card yellow">
+                    <div class="sub-card-title">
+                        <span class="status-indicator yellow"></span>
+                        Зеленый коридор
+                    </div>
+                    <div class="sub-card-value">
+                        N/A
+                    </div>
+                </div>
+                </div>
+            </div>
+            <div class="card green has-children">
+                <div class="card-title">
+                    <span class="status-indicator green"></span>
+                    DB
+                </div>
+                <div class="card-content">
+                    2 элементов
+                </div>
+                <div class="sub-cards">
+                <div class="sub-card green has-children">
+                    <div class="sub-card-title">
+                        <span class="status-indicator green"></span>
+                        System Usage
+                    </div>
+                    <div class="sub-card-value">
+                        3 элементов
+                    </div>
+                    <div class="sub-cards">
+                    <div class="sub-card green">
+                        <div class="sub-card-title">
+                            <span class="status-indicator green"></span>
+                            CPU
+                        </div>
+                        <div class="sub-card-value">
+                            ok
+                        </div>
+                    </div>
+                    <div class="sub-card green">
+                        <div class="sub-card-title">
+                            <span class="status-indicator green"></span>
+                            Memory
+                        </div>
+                        <div class="sub-card-value">
+                            ok
+                        </div>
+                    </div>
+                    <div class="sub-card green">
+                        <div class="sub-card-title">
+                            <span class="status-indicator green"></span>
+                            Disk
+                        </div>
+                        <div class="sub-card-value">
+                            ok
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                <div class="sub-card green">
+                    <div class="sub-card-title">
+                        <span class="status-indicator green"></span>
+                        PG Settings
+                    </div>
+                    <div class="sub-card-value">
+                        ok
+                    </div>
+                </div>
+                </div>
+            </div>
+            <div class="card green has-children">
+                <div class="card-title">
+                    <span class="status-indicator green"></span>
+                    Kafka
+                </div>
+                <div class="card-content">
+                    3 элементов
+                </div>
+                <div class="sub-cards">
+                <div class="sub-card green has-children">
+                    <div class="sub-card-title">
+                        <span class="status-indicator green"></span>
+                        System Usage
+                    </div>
+                    <div class="sub-card-value">
+                        3 элементов
+                    </div>
+                    <div class="sub-cards">
+                    <div class="sub-card green">
+                        <div class="sub-card-title">
+                            <span class="status-indicator green"></span>
+                            CPU
+                        </div>
+                        <div class="sub-card-value">
+                            ok
+                        </div>
+                    </div>
+                    <div class="sub-card green">
+                        <div class="sub-card-title">
+                            <span class="status-indicator green"></span>
+                            Memory
+                        </div>
+                        <div class="sub-card-value">
+                            ok
+                        </div>
+                    </div>
+                    <div class="sub-card green">
+                        <div class="sub-card-title">
+                            <span class="status-indicator green"></span>
+                            Disk
+                        </div>
+                        <div class="sub-card-value">
+                            ok
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                <div class="sub-card green">
+                    <div class="sub-card-title">
+                        <span class="status-indicator green"></span>
+                        Lag
+                    </div>
+                    <div class="sub-card-value">
+                        ok
+                    </div>
+                </div>
+                <div class="sub-card yellow">
+                    <div class="sub-card-title">
+                        <span class="status-indicator yellow"></span>
+                        Configuration
+                    </div>
+                    <div class="sub-card-value">
+                        N/A
+                    </div>
+                </div>
+                </div>
+            </div>
+            <div class="card green has-children">
+                <div class="card-title">
+                    <span class="status-indicator green"></span>
+                    BN
+                </div>
+                <div class="card-content">
+                    2 элементов
+                </div>
+                <div class="sub-cards">
+                <div class="sub-card green has-children">
+                    <div class="sub-card-title">
+                        <span class="status-indicator green"></span>
+                        System Usage
+                    </div>
+                    <div class="sub-card-value">
+                        3 элементов
+                    </div>
+                    <div class="sub-cards">
+                    <div class="sub-card green">
+                        <div class="sub-card-title">
+                            <span class="status-indicator green"></span>
+                            CPU
+                        </div>
+                        <div class="sub-card-value">
+                            ok
+                        </div>
+                    </div>
+                    <div class="sub-card green">
+                        <div class="sub-card-title">
+                            <span class="status-indicator green"></span>
+                            Memory
+                        </div>
+                        <div class="sub-card-value">
+                            ok
+                        </div>
+                    </div>
+                    <div class="sub-card green">
+                        <div class="sub-card-title">
+                            <span class="status-indicator green"></span>
+                            Disk
+                        </div>
+                        <div class="sub-card-value">
+                            ok
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                <div class="sub-card green">
+                    <div class="sub-card-title">
+                        <span class="status-indicator green"></span>
+                        Connections
+                    </div>
+                    <div class="sub-card-value">
+                        ok
+                    </div>
+                </div>
+                </div>
+            </div>
+            <div class="card yellow">
+                <div class="card-title">
+                    <span class="status-indicator yellow"></span>
+                    PG Report
+                </div>
+                <div class="card-content">
+                    N/A
+                </div>
+            </div>
+        </div>
+        <div id="tps-details" class="tps-details" style="display: none;">
+            <h2>📈 Детали TPS</h2>
+            <div class="tps-content">
+                <div class="tps-table-container">
+                    <table id="tps-table" class="tps-table">
+                        <thead>
+                            <tr>
+                                <th>SubSystem</th>
+                                <th>Operation</th>
+                                <th>TPS Profile</th>
+                                <th>TPS Fact</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tps-table-body">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="tps-chart-container">
+                    <canvas id="tps-chart" width="400" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        <div id="zk-details" class="zk-details" style="display: none;">
+            <h2>🏗️ Детали Зеленого коридора</h2>
+            <div class="zk-content">
+                <div class="zk-table-container">
+                    <table id="zk-table" class="zk-table">
+                        <thead>
+                            <tr>
+                                <th>Pod</th>
+                                <th>Count</th>
+                                <th>Sum CPU Rq</th>
+                                <th>Sum CPU Lim</th>
+                                <th>Sum CPU Use</th>
+                                <th>Sum Mem Rq</th>
+                                <th>Sum Mem Lim</th>
+                                <th>Sum Mem Use</th>
+                                <th>CPU Use %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="zk-table-body">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="zk-charts-container">
+                    <div class="chart-section">
+                        <h3>CPU Usage</h3>
+                        <canvas id="cpu-chart" width="400" height="300"></canvas>
+                    </div>
+                    <div class="chart-section">
+                        <h3>Memory Usage</h3>
+                        <canvas id="mem-chart" width="400" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="kafka-details" class="zk-details" style="display: none;">
+            <h2>🧩 Детали Kafka</h2>
+            <div class="zk-content">
+                <div class="zk-table-container">
+                    <table id="kafka-table" class="zk-table">
+                        <thead id="kafka-table-head">
+                        </thead>
+                        <tbody id="kafka-table-body">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="zk-charts-container">
+                    <div class="chart-section">
+                        <h3>Lag</h3>
+                        <canvas id="kafka-lag-chart" width="400" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="pg-details" class="zk-details" style="display: none;">
+            <h2>🛠️ PG Settings</h2>
+            <div class="zk-content">
+                <div class="zk-table-container">
+                    <table id="pg-table" class="zk-table">
+                        <thead>
+                            <tr>
+                                <th>name</th>
+                                <th>setting</th>
+                                <th>source</th>
+                                <th>min_val</th>
+                                <th>max_val</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pg-table-body">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+            <script>
+                // Данные профиля из JSON
+                const profileData = {"operations":[{"name":"Prep","subSystem":"main","TPS profile":213,"TPS fact":213},{"name":"Exec","subSystem":"main","TPS profile":400,"TPS fact":543}]};
+
+                // Данные ZK из JSON
+                const zkData = {"res":[{"pod":"ingress","count":5,"containers":[{"container":"istio","CPU Rq":200,"CPU Lim":200,"CPU Use":50,"Mem Rq":500,"Mem Lim":1000,"Mem Use":100},{"container":"fluent","CPU Rq":300,"CPU Lim":400,"CPU Use":150,"Mem Rq":500,"Mem Lim":1000,"Mem Use":100},{"container":"OTT","CPU Rq":100,"CPU Lim":200,"CPU Use":170,"Mem Rq":100,"Mem Lim":100,"Mem Use":90}]},{"pod":"egress","count":5,"containers":[{"container":"istio","CPU Rq":200,"CPU Lim":200,"CPU Use":200,"Mem Rq":500,"Mem Lim":1000,"Mem Use":100},{"container":"fluent","CPU Rq":300,"CPU Lim":400,"CPU Use":150,"Mem Rq":500,"Mem Lim":1000,"Mem Use":100},{"container":"OTT","CPU Rq":100,"CPU Lim":200,"CPU Use":170,"Mem Rq":100,"Mem Lim":100,"Mem Use":90}]}]};
+
+                // Данные Kafka из JSON
+                const kafkaData = {"brokers":[{"server":"123.123.123.123","avgCpu":10,"maxCpu":10,"avgMem":50,"maxMem":50,"diskUsage":30},{"server":"111.111.111.111","avgCpu":20,"maxCpu":10,"avgMem":30,"maxMem":50,"diskUsage":30},{"server":"777.777.777.777","avgCpu":60,"maxCpu":10,"avgMem":60,"maxMem":50,"diskUsage":60}],"lag":{"topic1":[10,11,15,12,15,15,14,12,14],"topic2":[10,21,15,22,35,25,44,52,14]},"settings":{"atr1":"value1","atr2":"value2","atr3":"value3","atr4":"value4","atr5":"value5"}};
+
+                const pgCsvText = "\"name\",\"setting\",\"source\",\"min_val\",\"max_val\"\r\n\"allow_alter_system\",\"on\",\"default\",NULL,NULL\r\n\"allow_in_place_tablespaces\",\"off\",\"default\",NULL,NULL\r\n\"allow_system_table_mods\",\"off\",\"default\",NULL,NULL\r\n\"application_name\",\"pgAdmin 4 - CONN:512067\",\"client\",NULL,NULL\r\n\"archive_cleanup_command\",\"\",\"default\",NULL,NULL\r\n\"archive_command\",\"(disabled)\",\"default\",NULL,NULL\r\n\"archive_library\",\"\",\"default\",NULL,NULL\r\n\"archive_mode\",\"off\",\"default\",NULL,NULL\r\n\"archive_timeout\",\"0\",\"default\",\"0\",\"1073741823\"\r\n\"array_nulls\",\"on\",\"default\",NULL,NULL\r\n\"authentication_timeout\",\"60\",\"default\",\"1\",\"600\"\r\n\"autovacuum\",\"on\",\"default\",NULL,NULL\r\n\"autovacuum_analyze_scale_factor\",\"0.1\",\"default\",\"0\",\"100\"\r\n\"autovacuum_analyze_threshold\",\"50\",\"default\",\"0\",\"2147483647\"\r\n\"autovacuum_freeze_max_age\",\"200000000\",\"default\",\"100000\",\"2000000000\"\r\n\"autovacuum_max_workers\",\"3\",\"default\",\"1\",\"262143\"\r\n\"autovacuum_multixact_freeze_max_age\",\"400000000\",\"default\",\"10000\",\"2000000000\"\r\n\"autovacuum_naptime\",\"60\",\"default\",\"1\",\"2147483\"\r\n\"autovacuum_vacuum_cost_delay\",\"2\",\"default\",\"-1\",\"100\"\r\n\"autovacuum_vacuum_cost_limit\",\"-1\",\"default\",\"-1\",\"10000\"\r\n\"autovacuum_vacuum_insert_scale_factor\",\"0.2\",\"default\",\"0\",\"100\"\r\n\"autovacuum_vacuum_insert_threshold\",\"1000\",\"default\",\"-1\",\"2147483647\"\r\n\"autovacuum_vacuum_scale_factor\",\"0.2\",\"default\",\"0\",\"100\"\r\n\"autovacuum_vacuum_threshold\",\"50\",\"default\",\"0\",\"2147483647\"\r\n\"autovacuum_work_mem\",\"-1\",\"default\",\"-1\",\"2097151\"\r\n\"backend_flush_after\",\"0\",\"default\",\"0\",\"256\"\r\n\"backslash_quote\",\"safe_encoding\",\"default\",NULL,NULL\r\n\"backtrace_functions\",\"\",\"default\",NULL,NULL\r\n\"bgwriter_delay\",\"200\",\"default\",\"10\",\"10000\"\r\n\"bgwriter_flush_after\",\"0\",\"default\",\"0\",\"256\"\r\n\"bgwriter_lru_maxpages\",\"100\",\"default\",\"0\",\"1073741823\"\r\n\"bgwriter_lru_multiplier\",\"2\",\"default\",\"0\",\"10\"\r\n\"block_size\",\"8192\",\"default\",\"8192\",\"8192\"\r\n\"bonjour\",\"off\",\"default\",NULL,NULL\r\n\"bonjour_name\",\"\",\"default\",NULL,NULL\r\n\"bytea_output\",\"hex\",\"session\",NULL,NULL\r\n\"check_function_bodies\",\"on\",\"default\",NULL,NULL\r\n\"checkpoint_completion_target\",\"0.9\",\"default\",\"0\",\"1\"\r\n\"checkpoint_flush_after\",\"0\",\"default\",\"0\",\"256\"\r\n\"checkpoint_timeout\",\"300\",\"default\",\"30\",\"86400\"\r\n\"checkpoint_warning\",\"30\",\"default\",\"0\",\"2147483647\"\r\n\"client_connection_check_interval\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"client_encoding\",\"UTF8\",\"session\",NULL,NULL\r\n\"client_min_messages\",\"notice\",\"session\",NULL,NULL\r\n\"cluster_name\",\"\",\"default\",NULL,NULL\r\n\"commit_delay\",\"0\",\"default\",\"0\",\"100000\"\r\n\"commit_siblings\",\"5\",\"default\",\"0\",\"1000\"\r\n\"commit_timestamp_buffers\",\"32\",\"default\",\"0\",\"131072\"\r\n\"compute_query_id\",\"auto\",\"default\",NULL,NULL\r\n\"config_file\",\"C:/Program Files/PostgreSQL/17/data/postgresql.conf\",\"override\",NULL,NULL\r\n\"constraint_exclusion\",\"partition\",\"default\",NULL,NULL\r\n\"cpu_index_tuple_cost\",\"0.005\",\"default\",\"0\",\"1.79769e+308\"\r\n\"cpu_operator_cost\",\"0.0025\",\"default\",\"0\",\"1.79769e+308\"\r\n\"cpu_tuple_cost\",\"0.01\",\"default\",\"0\",\"1.79769e+308\"\r\n\"createrole_self_grant\",\"\",\"default\",NULL,NULL\r\n\"cursor_tuple_fraction\",\"0.1\",\"default\",\"0\",\"1\"\r\n\"data_checksums\",\"off\",\"default\",NULL,NULL\r\n\"data_directory\",\"C:/Program Files/PostgreSQL/17/data\",\"override\",NULL,NULL\r\n\"data_directory_mode\",\"0700\",\"default\",\"0\",\"511\"\r\n\"data_sync_retry\",\"off\",\"default\",NULL,NULL\r\n\"DateStyle\",\"ISO, DMY\",\"session\",NULL,NULL\r\n\"deadlock_timeout\",\"1000\",\"default\",\"1\",\"2147483647\"\r\n\"debug_assertions\",\"off\",\"default\",NULL,NULL\r\n\"debug_discard_caches\",\"0\",\"default\",\"0\",\"0\"\r\n\"debug_io_direct\",\"\",\"default\",NULL,NULL\r\n\"debug_logical_replication_streaming\",\"buffered\",\"default\",NULL,NULL\r\n\"debug_parallel_query\",\"off\",\"default\",NULL,NULL\r\n\"debug_pretty_print\",\"on\",\"default\",NULL,NULL\r\n\"debug_print_parse\",\"off\",\"default\",NULL,NULL\r\n\"debug_print_plan\",\"off\",\"default\",NULL,NULL\r\n\"debug_print_rewritten\",\"off\",\"default\",NULL,NULL\r\n\"default_statistics_target\",\"100\",\"default\",\"1\",\"10000\"\r\n\"default_table_access_method\",\"heap\",\"default\",NULL,NULL\r\n\"default_tablespace\",\"\",\"default\",NULL,NULL\r\n\"default_text_search_config\",\"pg_catalog.russian\",\"configuration file\",NULL,NULL\r\n\"default_toast_compression\",\"pglz\",\"default\",NULL,NULL\r\n\"default_transaction_deferrable\",\"off\",\"default\",NULL,NULL\r\n\"default_transaction_isolation\",\"read committed\",\"default\",NULL,NULL\r\n\"default_transaction_read_only\",\"off\",\"default\",NULL,NULL\r\n\"dynamic_library_path\",\"$libdir\",\"default\",NULL,NULL\r\n\"dynamic_shared_memory_type\",\"windows\",\"configuration file\",NULL,NULL\r\n\"effective_cache_size\",\"524288\",\"default\",\"1\",\"2147483647\"\r\n\"effective_io_concurrency\",\"0\",\"default\",\"0\",\"1000\"\r\n\"enable_async_append\",\"on\",\"default\",NULL,NULL\r\n\"enable_bitmapscan\",\"on\",\"default\",NULL,NULL\r\n\"enable_gathermerge\",\"on\",\"default\",NULL,NULL\r\n\"enable_group_by_reordering\",\"on\",\"default\",NULL,NULL\r\n\"enable_hashagg\",\"on\",\"default\",NULL,NULL\r\n\"enable_hashjoin\",\"on\",\"default\",NULL,NULL\r\n\"enable_incremental_sort\",\"on\",\"default\",NULL,NULL\r\n\"enable_indexonlyscan\",\"on\",\"default\",NULL,NULL\r\n\"enable_indexscan\",\"on\",\"default\",NULL,NULL\r\n\"enable_material\",\"on\",\"default\",NULL,NULL\r\n\"enable_memoize\",\"on\",\"default\",NULL,NULL\r\n\"enable_mergejoin\",\"on\",\"default\",NULL,NULL\r\n\"enable_nestloop\",\"on\",\"default\",NULL,NULL\r\n\"enable_parallel_append\",\"on\",\"default\",NULL,NULL\r\n\"enable_parallel_hash\",\"on\",\"default\",NULL,NULL\r\n\"enable_partition_pruning\",\"on\",\"default\",NULL,NULL\r\n\"enable_partitionwise_aggregate\",\"off\",\"default\",NULL,NULL\r\n\"enable_partitionwise_join\",\"off\",\"default\",NULL,NULL\r\n\"enable_presorted_aggregate\",\"on\",\"default\",NULL,NULL\r\n\"enable_seqscan\",\"on\",\"default\",NULL,NULL\r\n\"enable_sort\",\"on\",\"default\",NULL,NULL\r\n\"enable_tidscan\",\"on\",\"default\",NULL,NULL\r\n\"escape_string_warning\",\"on\",\"default\",NULL,NULL\r\n\"event_source\",\"PostgreSQL\",\"default\",NULL,NULL\r\n\"event_triggers\",\"on\",\"default\",NULL,NULL\r\n\"exit_on_error\",\"off\",\"default\",NULL,NULL\r\n\"external_pid_file\",\"\",\"default\",NULL,NULL\r\n\"extra_float_digits\",\"1\",\"default\",\"-15\",\"3\"\r\n\"from_collapse_limit\",\"8\",\"default\",\"1\",\"2147483647\"\r\n\"fsync\",\"on\",\"default\",NULL,NULL\r\n\"full_page_writes\",\"on\",\"default\",NULL,NULL\r\n\"geqo\",\"on\",\"default\",NULL,NULL\r\n\"geqo_effort\",\"5\",\"default\",\"1\",\"10\"\r\n\"geqo_generations\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"geqo_pool_size\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"geqo_seed\",\"0\",\"default\",\"0\",\"1\"\r\n\"geqo_selection_bias\",\"2\",\"default\",\"1.5\",\"2\"\r\n\"geqo_threshold\",\"12\",\"default\",\"2\",\"2147483647\"\r\n\"gin_fuzzy_search_limit\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"gin_pending_list_limit\",\"4096\",\"default\",\"64\",\"2097151\"\r\n\"gss_accept_delegation\",\"off\",\"default\",NULL,NULL\r\n\"hash_mem_multiplier\",\"2\",\"default\",\"1\",\"1000\"\r\n\"hba_file\",\"C:/Program Files/PostgreSQL/17/data/pg_hba.conf\",\"override\",NULL,NULL\r\n\"hot_standby\",\"on\",\"default\",NULL,NULL\r\n\"hot_standby_feedback\",\"off\",\"default\",NULL,NULL\r\n\"huge_page_size\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"huge_pages\",\"try\",\"default\",NULL,NULL\r\n\"huge_pages_status\",\"off\",\"default\",NULL,NULL\r\n\"icu_validation_level\",\"warning\",\"default\",NULL,NULL\r\n\"ident_file\",\"C:/Program Files/PostgreSQL/17/data/pg_ident.conf\",\"override\",NULL,NULL\r\n\"idle_in_transaction_session_timeout\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"idle_session_timeout\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"ignore_checksum_failure\",\"off\",\"default\",NULL,NULL\r\n\"ignore_invalid_pages\",\"off\",\"default\",NULL,NULL\r\n\"ignore_system_indexes\",\"off\",\"default\",NULL,NULL\r\n\"in_hot_standby\",\"off\",\"default\",NULL,NULL\r\n\"integer_datetimes\",\"on\",\"default\",NULL,NULL\r\n\"IntervalStyle\",\"postgres\",\"default\",NULL,NULL\r\n\"io_combine_limit\",\"16\",\"default\",\"1\",\"16\"\r\n\"jit\",\"on\",\"default\",NULL,NULL\r\n\"jit_above_cost\",\"100000\",\"default\",\"-1\",\"1.79769e+308\"\r\n\"jit_debugging_support\",\"off\",\"default\",NULL,NULL\r\n\"jit_dump_bitcode\",\"off\",\"default\",NULL,NULL\r\n\"jit_expressions\",\"on\",\"default\",NULL,NULL\r\n\"jit_inline_above_cost\",\"500000\",\"default\",\"-1\",\"1.79769e+308\"\r\n\"jit_optimize_above_cost\",\"500000\",\"default\",\"-1\",\"1.79769e+308\"\r\n\"jit_profiling_support\",\"off\",\"default\",NULL,NULL\r\n\"jit_provider\",\"llvmjit\",\"default\",NULL,NULL\r\n\"jit_tuple_deforming\",\"on\",\"default\",NULL,NULL\r\n\"join_collapse_limit\",\"8\",\"default\",\"1\",\"2147483647\"\r\n\"krb_caseins_users\",\"off\",\"default\",NULL,NULL\r\n\"krb_server_keyfile\",\"\",\"default\",NULL,NULL\r\n\"lc_messages\",\"Russian_Russia.1251\",\"configuration file\",NULL,NULL\r\n\"lc_monetary\",\"Russian_Russia.1251\",\"configuration file\",NULL,NULL\r\n\"lc_numeric\",\"Russian_Russia.1251\",\"configuration file\",NULL,NULL\r\n\"lc_time\",\"Russian_Russia.1251\",\"configuration file\",NULL,NULL\r\n\"listen_addresses\",\"*\",\"configuration file\",NULL,NULL\r\n\"lo_compat_privileges\",\"off\",\"default\",NULL,NULL\r\n\"local_preload_libraries\",\"\",\"default\",NULL,NULL\r\n\"lock_timeout\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"log_autovacuum_min_duration\",\"600000\",\"default\",\"-1\",\"2147483647\"\r\n\"log_checkpoints\",\"on\",\"default\",NULL,NULL\r\n\"log_connections\",\"off\",\"default\",NULL,NULL\r\n\"log_destination\",\"stderr\",\"configuration file\",NULL,NULL\r\n\"log_directory\",\"log\",\"default\",NULL,NULL\r\n\"log_disconnections\",\"off\",\"default\",NULL,NULL\r\n\"log_duration\",\"off\",\"default\",NULL,NULL\r\n\"log_error_verbosity\",\"default\",\"default\",NULL,NULL\r\n\"log_executor_stats\",\"off\",\"default\",NULL,NULL\r\n\"log_file_mode\",\"0640\",\"configuration file\",\"0\",\"511\"\r\n\"log_filename\",\"postgresql-%Y-%m-%d_%H%M%S.log\",\"default\",NULL,NULL\r\n\"log_hostname\",\"off\",\"default\",NULL,NULL\r\n\"log_line_prefix\",\"%t \",\"configuration file\",NULL,NULL\r\n\"log_lock_waits\",\"off\",\"default\",NULL,NULL\r\n\"log_min_duration_sample\",\"-1\",\"default\",\"-1\",\"2147483647\"\r\n\"log_min_duration_statement\",\"-1\",\"default\",\"-1\",\"2147483647\"\r\n\"log_min_error_statement\",\"error\",\"default\",NULL,NULL\r\n\"log_min_messages\",\"warning\",\"default\",NULL,NULL\r\n\"log_parameter_max_length\",\"-1\",\"default\",\"-1\",\"1073741823\"\r\n\"log_parameter_max_length_on_error\",\"0\",\"default\",\"-1\",\"1073741823\"\r\n\"log_parser_stats\",\"off\",\"default\",NULL,NULL\r\n\"log_planner_stats\",\"off\",\"default\",NULL,NULL\r\n\"log_recovery_conflict_waits\",\"off\",\"default\",NULL,NULL\r\n\"log_replication_commands\",\"off\",\"default\",NULL,NULL\r\n\"log_rotation_age\",\"1440\",\"default\",\"0\",\"35791394\"\r\n\"log_rotation_size\",\"10240\",\"default\",\"0\",\"2097151\"\r\n\"log_startup_progress_interval\",\"10000\",\"default\",\"0\",\"2147483647\"\r\n\"log_statement\",\"none\",\"default\",NULL,NULL\r\n\"log_statement_sample_rate\",\"1\",\"default\",\"0\",\"1\"\r\n\"log_statement_stats\",\"off\",\"default\",NULL,NULL\r\n\"log_temp_files\",\"-1\",\"default\",\"-1\",\"2147483647\"\r\n\"log_timezone\",\"Europe/Samara\",\"configuration file\",NULL,NULL\r\n\"log_transaction_sample_rate\",\"0\",\"default\",\"0\",\"1\"\r\n\"log_truncate_on_rotation\",\"off\",\"default\",NULL,NULL\r\n\"logging_collector\",\"on\",\"configuration file\",NULL,NULL\r\n\"logical_decoding_work_mem\",\"65536\",\"default\",\"64\",\"2097151\"\r\n\"maintenance_io_concurrency\",\"0\",\"default\",\"0\",\"1000\"\r\n\"maintenance_work_mem\",\"65536\",\"default\",\"64\",\"2097151\"\r\n\"max_connections\",\"100\",\"configuration file\",\"1\",\"262143\"\r\n\"max_files_per_process\",\"1000\",\"default\",\"64\",\"2147483647\"\r\n\"max_function_args\",\"100\",\"default\",\"100\",\"100\"\r\n\"max_identifier_length\",\"63\",\"default\",\"63\",\"63\"\r\n\"max_index_keys\",\"32\",\"default\",\"32\",\"32\"\r\n\"max_locks_per_transaction\",\"64\",\"default\",\"10\",\"2147483647\"\r\n\"max_logical_replication_workers\",\"4\",\"default\",\"0\",\"262143\"\r\n\"max_notify_queue_pages\",\"1048576\",\"default\",\"64\",\"2147483647\"\r\n\"max_parallel_apply_workers_per_subscription\",\"2\",\"default\",\"0\",\"1024\"\r\n\"max_parallel_maintenance_workers\",\"2\",\"default\",\"0\",\"1024\"\r\n\"max_parallel_workers\",\"8\",\"default\",\"0\",\"1024\"\r\n\"max_parallel_workers_per_gather\",\"2\",\"default\",\"0\",\"1024\"\r\n\"max_pred_locks_per_page\",\"2\",\"default\",\"0\",\"2147483647\"\r\n\"max_pred_locks_per_relation\",\"-2\",\"default\",\"-2147483648\",\"2147483647\"\r\n\"max_pred_locks_per_transaction\",\"64\",\"default\",\"10\",\"2147483647\"\r\n\"max_prepared_transactions\",\"0\",\"default\",\"0\",\"262143\"\r\n\"max_replication_slots\",\"10\",\"default\",\"0\",\"262143\"\r\n\"max_slot_wal_keep_size\",\"-1\",\"default\",\"-1\",\"2097151\"\r\n\"max_stack_depth\",\"2048\",\"default\",\"100\",\"2097151\"\r\n\"max_standby_archive_delay\",\"30000\",\"default\",\"-1\",\"2147483647\"\r\n\"max_standby_streaming_delay\",\"30000\",\"default\",\"-1\",\"2147483647\"\r\n\"max_sync_workers_per_subscription\",\"2\",\"default\",\"0\",\"262143\"\r\n\"max_wal_senders\",\"10\",\"default\",\"0\",\"262143\"\r\n\"max_wal_size\",\"1024\",\"configuration file\",\"2\",\"2097151\"\r\n\"max_worker_processes\",\"8\",\"default\",\"0\",\"262143\"\r\n\"min_dynamic_shared_memory\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"min_parallel_index_scan_size\",\"64\",\"default\",\"0\",\"715827882\"\r\n\"min_parallel_table_scan_size\",\"1024\",\"default\",\"0\",\"715827882\"\r\n\"min_wal_size\",\"80\",\"configuration file\",\"2\",\"2097151\"\r\n\"multixact_member_buffers\",\"32\",\"default\",\"16\",\"131072\"\r\n\"multixact_offset_buffers\",\"16\",\"default\",\"16\",\"131072\"\r\n\"notify_buffers\",\"16\",\"default\",\"16\",\"131072\"\r\n\"parallel_leader_participation\",\"on\",\"default\",NULL,NULL\r\n\"parallel_setup_cost\",\"1000\",\"default\",\"0\",\"1.79769e+308\"\r\n\"parallel_tuple_cost\",\"0.1\",\"default\",\"0\",\"1.79769e+308\"\r\n\"password_encryption\",\"scram-sha-256\",\"default\",NULL,NULL\r\n\"plan_cache_mode\",\"auto\",\"default\",NULL,NULL\r\n\"port\",\"5432\",\"configuration file\",\"1\",\"65535\"\r\n\"post_auth_delay\",\"0\",\"default\",\"0\",\"2147\"\r\n\"pre_auth_delay\",\"0\",\"default\",\"0\",\"60\"\r\n\"primary_conninfo\",\"\",\"default\",NULL,NULL\r\n\"primary_slot_name\",\"\",\"default\",NULL,NULL\r\n\"quote_all_identifiers\",\"off\",\"default\",NULL,NULL\r\n\"random_page_cost\",\"4\",\"default\",\"0\",\"1.79769e+308\"\r\n\"recovery_end_command\",\"\",\"default\",NULL,NULL\r\n\"recovery_init_sync_method\",\"fsync\",\"default\",NULL,NULL\r\n\"recovery_min_apply_delay\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"recovery_prefetch\",\"try\",\"default\",NULL,NULL\r\n\"recovery_target\",\"\",\"default\",NULL,NULL\r\n\"recovery_target_action\",\"pause\",\"default\",NULL,NULL\r\n\"recovery_target_inclusive\",\"on\",\"default\",NULL,NULL\r\n\"recovery_target_lsn\",\"\",\"default\",NULL,NULL\r\n\"recovery_target_name\",\"\",\"default\",NULL,NULL\r\n\"recovery_target_time\",\"\",\"default\",NULL,NULL\r\n\"recovery_target_timeline\",\"latest\",\"default\",NULL,NULL\r\n\"recovery_target_xid\",\"\",\"default\",NULL,NULL\r\n\"recursive_worktable_factor\",\"10\",\"default\",\"0.001\",\"1e+06\"\r\n\"remove_temp_files_after_crash\",\"on\",\"default\",NULL,NULL\r\n\"reserved_connections\",\"0\",\"default\",\"0\",\"262143\"\r\n\"restart_after_crash\",\"on\",\"default\",NULL,NULL\r\n\"restore_command\",\"\",\"default\",NULL,NULL\r\n\"restrict_nonsystem_relation_kind\",\"\",\"default\",NULL,NULL\r\n\"row_security\",\"on\",\"default\",NULL,NULL\r\n\"scram_iterations\",\"4096\",\"default\",\"1\",\"2147483647\"\r\n\"search_path\",\"\"\"$user\"\", public\",\"default\",NULL,NULL\r\n\"segment_size\",\"131072\",\"default\",\"131072\",\"131072\"\r\n\"send_abort_for_crash\",\"off\",\"default\",NULL,NULL\r\n\"send_abort_for_kill\",\"off\",\"default\",NULL,NULL\r\n\"seq_page_cost\",\"1\",\"default\",\"0\",\"1.79769e+308\"\r\n\"serializable_buffers\",\"32\",\"default\",\"16\",\"131072\"\r\n\"server_encoding\",\"UTF8\",\"default\",NULL,NULL\r\n\"server_version\",\"17.5\",\"default\",NULL,NULL\r\n\"server_version_num\",\"170005\",\"default\",\"170005\",\"170005\"\r\n\"session_preload_libraries\",\"\",\"default\",NULL,NULL\r\n\"session_replication_role\",\"origin\",\"default\",NULL,NULL\r\n\"shared_buffers\",\"16384\",\"configuration file\",\"16\",\"1073741823\"\r\n\"shared_memory_size\",\"143\",\"default\",\"0\",\"2147483647\"\r\n\"shared_memory_size_in_huge_pages\",\"-1\",\"default\",\"-1\",\"2147483647\"\r\n\"shared_memory_type\",\"windows\",\"default\",NULL,NULL\r\n\"shared_preload_libraries\",\"\",\"default\",NULL,NULL\r\n\"ssl\",\"off\",\"default\",NULL,NULL\r\n\"ssl_ca_file\",\"\",\"default\",NULL,NULL\r\n\"ssl_cert_file\",\"server.crt\",\"default\",NULL,NULL\r\n\"ssl_ciphers\",\"HIGH:MEDIUM:+3DES:!aNULL\",\"default\",NULL,NULL\r\n\"ssl_crl_dir\",\"\",\"default\",NULL,NULL\r\n\"ssl_crl_file\",\"\",\"default\",NULL,NULL\r\n\"ssl_dh_params_file\",\"\",\"default\",NULL,NULL\r\n\"ssl_ecdh_curve\",\"prime256v1\",\"default\",NULL,NULL\r\n\"ssl_key_file\",\"server.key\",\"default\",NULL,NULL\r\n\"ssl_library\",\"OpenSSL\",\"default\",NULL,NULL\r\n\"ssl_max_protocol_version\",\"\",\"default\",NULL,NULL\r\n\"ssl_min_protocol_version\",\"TLSv1.2\",\"default\",NULL,NULL\r\n\"ssl_passphrase_command\",\"\",\"default\",NULL,NULL\r\n\"ssl_passphrase_command_supports_reload\",\"off\",\"default\",NULL,NULL\r\n\"ssl_prefer_server_ciphers\",\"on\",\"default\",NULL,NULL\r\n\"standard_conforming_strings\",\"on\",\"default\",NULL,NULL\r\n\"statement_timeout\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"stats_fetch_consistency\",\"cache\",\"default\",NULL,NULL\r\n\"subtransaction_buffers\",\"32\",\"default\",\"0\",\"131072\"\r\n\"summarize_wal\",\"off\",\"default\",NULL,NULL\r\n\"superuser_reserved_connections\",\"3\",\"default\",\"0\",\"262143\"\r\n\"sync_replication_slots\",\"off\",\"default\",NULL,NULL\r\n\"synchronize_seqscans\",\"on\",\"default\",NULL,NULL\r\n\"synchronized_standby_slots\",\"\",\"default\",NULL,NULL\r\n\"synchronous_commit\",\"on\",\"default\",NULL,NULL\r\n\"synchronous_standby_names\",\"\",\"default\",NULL,NULL\r\n\"syslog_facility\",\"none\",\"default\",NULL,NULL\r\n\"syslog_ident\",\"postgres\",\"default\",NULL,NULL\r\n\"syslog_sequence_numbers\",\"on\",\"default\",NULL,NULL\r\n\"syslog_split_messages\",\"on\",\"default\",NULL,NULL\r\n\"tcp_keepalives_count\",\"10\",\"default\",\"0\",\"2147483647\"\r\n\"tcp_keepalives_idle\",\"-1\",\"default\",\"0\",\"2147483647\"\r\n\"tcp_keepalives_interval\",\"-1\",\"default\",\"0\",\"2147483647\"\r\n\"tcp_user_timeout\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"temp_buffers\",\"1024\",\"default\",\"100\",\"1073741823\"\r\n\"temp_file_limit\",\"-1\",\"default\",\"-1\",\"2147483647\"\r\n\"temp_tablespaces\",\"\",\"default\",NULL,NULL\r\n\"TimeZone\",\"Europe/Samara\",\"configuration file\",NULL,NULL\r\n\"timezone_abbreviations\",\"Default\",\"default\",NULL,NULL\r\n\"trace_connection_negotiation\",\"off\",\"default\",NULL,NULL\r\n\"trace_notify\",\"off\",\"default\",NULL,NULL\r\n\"trace_sort\",\"off\",\"default\",NULL,NULL\r\n\"track_activities\",\"on\",\"default\",NULL,NULL\r\n\"track_activity_query_size\",\"1024\",\"default\",\"100\",\"1048576\"\r\n\"track_commit_timestamp\",\"off\",\"default\",NULL,NULL\r\n\"track_counts\",\"on\",\"default\",NULL,NULL\r\n\"track_functions\",\"none\",\"default\",NULL,NULL\r\n\"track_io_timing\",\"off\",\"default\",NULL,NULL\r\n\"track_wal_io_timing\",\"off\",\"default\",NULL,NULL\r\n\"transaction_buffers\",\"32\",\"default\",\"0\",\"131072\"\r\n\"transaction_deferrable\",\"off\",\"override\",NULL,NULL\r\n\"transaction_isolation\",\"read committed\",\"override\",NULL,NULL\r\n\"transaction_read_only\",\"off\",\"override\",NULL,NULL\r\n\"transaction_timeout\",\"0\",\"default\",\"0\",\"2147483647\"\r\n\"transform_null_equals\",\"off\",\"default\",NULL,NULL\r\n\"unix_socket_directories\",\"\",\"default\",NULL,NULL\r\n\"unix_socket_group\",\"\",\"default\",NULL,NULL\r\n\"unix_socket_permissions\",\"0777\",\"default\",\"0\",\"511\"\r\n\"update_process_title\",\"off\",\"default\",NULL,NULL\r\n\"vacuum_buffer_usage_limit\",\"2048\",\"default\",\"0\",\"16777216\"\r\n\"vacuum_cost_delay\",\"0\",\"default\",\"0\",\"100\"\r\n\"vacuum_cost_limit\",\"200\",\"default\",\"1\",\"10000\"\r\n\"vacuum_cost_page_dirty\",\"20\",\"default\",\"0\",\"10000\"\r\n\"vacuum_cost_page_hit\",\"1\",\"default\",\"0\",\"10000\"\r\n\"vacuum_cost_page_miss\",\"2\",\"default\",\"0\",\"10000\"\r\n\"vacuum_failsafe_age\",\"1600000000\",\"default\",\"0\",\"2100000000\"\r\n\"vacuum_freeze_min_age\",\"50000000\",\"default\",\"0\",\"1000000000\"\r\n\"vacuum_freeze_table_age\",\"150000000\",\"default\",\"0\",\"2000000000\"\r\n\"vacuum_multixact_failsafe_age\",\"1600000000\",\"default\",\"0\",\"2100000000\"\r\n\"vacuum_multixact_freeze_min_age\",\"5000000\",\"default\",\"0\",\"1000000000\"\r\n\"vacuum_multixact_freeze_table_age\",\"150000000\",\"default\",\"0\",\"2000000000\"\r\n\"wal_block_size\",\"8192\",\"default\",\"8192\",\"8192\"\r\n\"wal_buffers\",\"512\",\"default\",\"-1\",\"262143\"\r\n\"wal_compression\",\"off\",\"default\",NULL,NULL\r\n\"wal_consistency_checking\",\"\",\"default\",NULL,NULL\r\n\"wal_decode_buffer_size\",\"524288\",\"default\",\"65536\",\"1073741823\"\r\n\"wal_init_zero\",\"on\",\"default\",NULL,NULL\r\n\"wal_keep_size\",\"0\",\"default\",\"0\",\"2097151\"\r\n\"wal_level\",\"replica\",\"default\",NULL,NULL\r\n\"wal_log_hints\",\"off\",\"default\",NULL,NULL\r\n\"wal_receiver_create_temp_slot\",\"off\",\"default\",NULL,NULL\r\n\"wal_receiver_status_interval\",\"10\",\"default\",\"0\",\"2147483\"\r\n\"wal_receiver_timeout\",\"60000\",\"default\",\"0\",\"2147483647\"\r\n\"wal_recycle\",\"on\",\"default\",NULL,NULL\r\n\"wal_retrieve_retry_interval\",\"5000\",\"default\",\"1\",\"2147483647\"\r\n\"wal_segment_size\",\"16777216\",\"default\",\"1048576\",\"1073741824\"\r\n\"wal_sender_timeout\",\"60000\",\"default\",\"0\",\"2147483647\"\r\n\"wal_skip_threshold\",\"2048\",\"default\",\"0\",\"2097151\"\r\n\"wal_summary_keep_time\",\"14400\",\"default\",\"0\",\"35791394\"\r\n\"wal_sync_method\",\"open_datasync\",\"default\",NULL,NULL\r\n\"wal_writer_delay\",\"200\",\"default\",\"1\",\"10000\"\r\n\"wal_writer_flush_after\",\"128\",\"default\",\"0\",\"2147483647\"\r\n\"work_mem\",\"4096\",\"default\",\"64\",\"2097151\"\r\n\"xmlbinary\",\"base64\",\"default\",NULL,NULL\r\n\"xmloption\",\"content\",\"default\",NULL,NULL\r\n\"zero_damaged_pages\",\"off\",\"default\",NULL,NULL\r\n";
+
+                function toggleCard(card) {
+                    const subCards = card.querySelector('.sub-cards');
+                    if (subCards.classList.contains('show')) {
+                        subCards.classList.remove('show');
+                        card.classList.remove('expanded');
+                    } else {
+                        subCards.classList.add('show');
+                        card.classList.add('expanded');
+                    }
+                }
+
+                // Предотвращаем всплытие событий для многоуровневых карточек
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Добавляем обработчики для всех карточек с дочерними элементами
+                    const allCardsWithChildren = document.querySelectorAll('.card.has-children, .sub-card.has-children');
+                    allCardsWithChildren.forEach(card => {
+                        // Добавляем обработчик клика с остановкой всплытия
+                        card.addEventListener('click', function(e) {
+                            // Проверяем, что клик НЕ был по подкарточкам
+                            const subCards = card.querySelector('.sub-cards');
+                            const isClickOnSubCards = subCards && subCards.contains(e.target);
+                            
+                            // Кликабельная область: вся карточка кроме подкарточек
+                            if (!isClickOnSubCards) {
+                                toggleCard(card);
+                            }
+                        });
+                    });
+                });
+
+                function showTpsDetails() {
+                    const tpsDetails = document.getElementById('tps-details');
+                    if (tpsDetails.style.display === 'none') {
+                        tpsDetails.style.display = 'block';
+                        populateTpsTable();
+                        createTpsChart();
+                    } else {
+                        tpsDetails.style.display = 'none';
+                    }
+                }
+
+                function populateTpsTable() {
+                    const tbody = document.getElementById('tps-table-body');
+                    tbody.innerHTML = '';
+                    
+                    profileData.operations.forEach(operation => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${operation.subSystem}</td>
+                            <td>${operation.name}</td>
+                            <td>${operation['TPS profile']}</td>
+                            <td>${operation['TPS fact']}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                }
+
+                function createTpsChart() {
+                    const ctx = document.getElementById('tps-chart').getContext('2d');
+                    
+                    const labels = profileData.operations.map(op => op.name);
+                    const profileValues = profileData.operations.map(op => op['TPS profile']);
+                    const factData = profileData.operations.map(op => op['TPS fact']);
+                    
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'TPS Profile',
+                                    data: profileValues,
+                                    backgroundColor: 'rgba(76, 175, 80, 0.8)',
+                                    borderColor: 'rgba(76, 175, 80, 1)',
+                                    borderWidth: 1,
+                                    stack: 'stack1'
+                                },
+                                {
+                                    label: 'TPS Fact (дополнительно)',
+                                    data: factData.map((fact, index) => Math.max(0, fact - profileValues[index])),
+                                    backgroundColor: 'rgba(33, 150, 243, 0.8)',
+                                    borderColor: 'rgba(33, 150, 243, 1)',
+                                    borderWidth: 1,
+                                    stack: 'stack1'
+                                }
+                            ]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: 'TPS Profile vs Fact (Накопительная диаграмма)'
+                                },
+                                legend: {
+                                    display: true,
+                                    position: 'top'
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        afterLabel: function(context) {
+                                            const index = context.dataIndex;
+                                            const profile = profileValues[index];
+                                            const fact = factData[index];
+                                            if (context.datasetIndex === 0) {
+                                                return `Планируемое: ${profile}`;
+                                            } else {
+                                                return `Фактическое: ${fact} (превышение: ${fact - profile})`;
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    stacked: true,
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'TPS Value'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                function showZkDetails() {
+                    const zkDetails = document.getElementById('zk-details');
+                    if (zkDetails.style.display === 'none') {
+                        zkDetails.style.display = 'block';
+                        populateZkTable();
+                    } else {
+                        zkDetails.style.display = 'none';
+                    }
+                }
+
+                function populateZkTable() {
+                    const tbody = document.getElementById('zk-table-body');
+                    tbody.innerHTML = '';
+                    
+                    zkData.res.forEach(pod => {
+                        const row = document.createElement('tr');
+                        
+                        // Вычисляем суммы для контейнеров
+                        let sumCpuRq = 0, sumCpuLim = 0, sumCpuUse = 0;
+                        let sumMemRq = 0, sumMemLim = 0, sumMemUse = 0;
+                        
+                        pod.containers.forEach(container => {
+                            sumCpuRq += container['CPU Rq'];
+                            sumCpuLim += container['CPU Lim'];
+                            sumCpuUse += container['CPU Use'];
+                            sumMemRq += container['Mem Rq'];
+                            sumMemLim += container['Mem Lim'];
+                            sumMemUse += container['Mem Use'];
+                        });
+                        
+                        const cpuUsePercent = sumCpuLim > 0 ? (sumCpuUse / sumCpuLim * 100).toFixed(1) : 0;
+                        
+                        row.innerHTML = `
+                            <td>${pod.pod}</td>
+                            <td>${pod.count}</td>
+                            <td>${sumCpuRq}</td>
+                            <td>${sumCpuLim}</td>
+                            <td>${sumCpuUse}</td>
+                            <td>${sumMemRq}</td>
+                            <td>${sumMemLim}</td>
+                            <td>${sumMemUse}</td>
+                            <td>${cpuUsePercent}%</td>
+                        `;
+                        
+                        // Добавляем цветовое кодирование на основе CPU Use %
+                        const cpuPercent = parseFloat(cpuUsePercent);
+                        if (cpuPercent >= 55 && cpuPercent <= 79) {
+                            row.classList.add('cpu-green');
+                        } else if (cpuPercent >= 40 && cpuPercent <= 54) {
+                            row.classList.add('cpu-yellow');
+                        } else if (cpuPercent < 40) {
+                            row.classList.add('cpu-light-yellow');
+                        } else if (cpuPercent > 80) {
+                            row.classList.add('cpu-light-red');
+                        }
+                        
+                        // Добавляем обработчик клика на строку
+                        row.classList.add('clickable');
+                        row.addEventListener('click', function() {
+                            createContainerCharts(pod);
+                        });
+                        
+                        tbody.appendChild(row);
+                    });
+                }
+
+                function createContainerCharts(pod) {
+                    // Создаем CPU диаграмму
+                    const cpuCtx = document.getElementById('cpu-chart').getContext('2d');
+                    const memCtx = document.getElementById('mem-chart').getContext('2d');
+                    
+                    const containerNames = pod.containers.map(c => c.container);
+                    const cpuLimData = pod.containers.map(c => c['CPU Lim']);
+                    const cpuUseData = pod.containers.map(c => c['CPU Use']);
+                    const memLimData = pod.containers.map(c => c['Mem Lim']);
+                    const memUseData = pod.containers.map(c => c['Mem Use']);
+                    
+                    // Уничтожаем существующие диаграммы
+                    if (window.cpuChart) window.cpuChart.destroy();
+                    if (window.memChart) window.memChart.destroy();
+                    
+                    // Создаем CPU диаграмму
+                    const cpuDatasets = [
+                        {
+                            label: 'CPU Usage',
+                            data: cpuUseData,
+                            backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y'
+                        }
+                    ];
+                    
+                    // Добавляем отдельную линию для каждого контейнера
+                    const colors = ['rgba(255, 99, 132, 1)', 'rgba(255, 159, 64, 1)', 'rgba(255, 205, 86, 1)', 'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)'];
+                    containerNames.forEach((containerName, index) => {
+                        // Создаем горизонтальную линию с одинаковым значением для всех контейнеров
+                        const lineData = new Array(containerNames.length).fill(cpuLimData[index]);
+                        
+                        cpuDatasets.push({
+                            label: `${containerName} CPU Limit`,
+                            data: lineData,
+                            type: 'line',
+                            borderColor: colors[index % colors.length],
+                            backgroundColor: colors[index % colors.length].replace('1)', '0.2)'),
+                            borderWidth: 2,
+                            fill: false,
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                            yAxisID: 'y'
+                        });
+                    });
+                    
+                    window.cpuChart = new Chart(cpuCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: containerNames,
+                            datasets: cpuDatasets
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: `CPU Usage - ${pod.pod}`
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'CPU Value'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Создаем Memory диаграмму
+                    const memDatasets = [
+                        {
+                            label: 'Memory Usage',
+                            data: memUseData,
+                            backgroundColor: 'rgba(75, 192, 192, 0.8)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y'
+                        }
+                    ];
+                    
+                    // Добавляем отдельную линию для каждого контейнера
+                    containerNames.forEach((containerName, index) => {
+                        // Создаем горизонтальную линию с одинаковым значением для всех контейнеров
+                        const lineData = new Array(containerNames.length).fill(memLimData[index]);
+                        
+                        memDatasets.push({
+                            label: `${containerName} Memory Limit`,
+                            data: lineData,
+                            type: 'line',
+                            borderColor: colors[index % colors.length],
+                            backgroundColor: colors[index % colors.length].replace('1)', '0.2)'),
+                            borderWidth: 2,
+                            fill: false,
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                            yAxisID: 'y'
+                        });
+                    });
+                    
+                    window.memChart = new Chart(memCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: containerNames,
+                            datasets: memDatasets
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: `Memory Usage - ${pod.pod}`
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Memory Value'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Добавляем обработчики кликов для многоуровневых карточек
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Находим все подкарточки на любом уровне вложенности
+                    const allSubCards = document.querySelectorAll('.sub-card');
+                    
+                    // Обработчик для TPS
+                    allSubCards.forEach(card => {
+                        const title = card.querySelector('.sub-card-title');
+                        if (title && title.textContent.trim() === 'TPS') {
+                            card.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                showTpsDetails();
+                            });
+                            card.classList.add('clickable');
+                            card.title = 'Кликните для просмотра деталей TPS';
+                        }
+                    });
+                    
+                    // Обработчик для Зеленый коридор
+                    allSubCards.forEach(card => {
+                        const title = card.querySelector('.sub-card-title');
+                        if (title && title.textContent.trim() === 'Зеленый коридор') {
+                            card.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                showZkDetails();
+                            });
+                            card.classList.add('clickable');
+                            card.title = 'Кликните для просмотра деталей Зеленого коридора';
+                        }
+                    });
+                });
+
+                // ===== Kafka =====
+                function showKafkaDetails() {
+                    const el = document.getElementById('kafka-details');
+                    if (el.style.display === 'none') { el.style.display = 'block'; }
+                }
+
+                function clearKafkaView() {
+                    const head = document.getElementById('kafka-table-head');
+                    const body = document.getElementById('kafka-table-body');
+                    head.innerHTML = '';
+                    body.innerHTML = '';
+                    const canvas = document.getElementById('kafka-lag-chart');
+                    const ctx = canvas.getContext('2d');
+                    if (window.kafkaLagChart) { window.kafkaLagChart.destroy(); }
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+
+                function renderKafkaCpu() {
+                    showKafkaDetails();
+                    clearKafkaView();
+                    const head = document.getElementById('kafka-table-head');
+                    const body = document.getElementById('kafka-table-body');
+                    head.innerHTML = `<tr><th>Server</th><th>Avg CPU %</th><th>Max CPU %</th></tr>`;
+                    kafkaData.brokers.forEach(b => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${b.server}</td><td>${b.avgCpu}%</td><td>${b.maxCpu}%</td>`;
+                        body.appendChild(tr);
+                    });
+                }
+
+                function renderKafkaMem() {
+                    showKafkaDetails();
+                    clearKafkaView();
+                    const head = document.getElementById('kafka-table-head');
+                    const body = document.getElementById('kafka-table-body');
+                    head.innerHTML = `<tr><th>Server</th><th>Avg MEM %</th><th>Max MEM %</th></tr>`;
+                    kafkaData.brokers.forEach(b => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${b.server}</td><td>${b.avgMem}%</td><td>${b.maxMem}%</td>`;
+                        body.appendChild(tr);
+                    });
+                }
+
+                function renderKafkaDisk() {
+                    showKafkaDetails();
+                    clearKafkaView();
+                    const head = document.getElementById('kafka-table-head');
+                    const body = document.getElementById('kafka-table-body');
+                    head.innerHTML = `<tr><th>Server</th><th>Disk Usage %</th></tr>`;
+                    kafkaData.brokers.forEach(b => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${b.server}</td><td>${b.diskUsage}%</td>`;
+                        body.appendChild(tr);
+                    });
+                }
+
+                function renderKafkaLag() {
+                    showKafkaDetails();
+                    // чистим таблицу, оставляем график
+                    const head = document.getElementById('kafka-table-head');
+                    const body = document.getElementById('kafka-table-body');
+                    head.innerHTML = ''; body.innerHTML = '';
+                    const ctx = document.getElementById('kafka-lag-chart').getContext('2d');
+                    if (window.kafkaLagChart) window.kafkaLagChart.destroy();
+                    const topics = Object.keys(kafkaData.lag || {});
+                    const maxLen = topics.reduce((m, t) => Math.max(m, (kafkaData.lag[t]||[]).length), 0);
+                    const labels = Array.from({length: maxLen}, (_, i) => `T${i+1}`);
+                    const palette = ['#e6194b','#3cb44b','#ffe119','#0082c8','#f58231','#911eb4','#46f0f0','#f032e6','#d2f53c','#fabebe'];
+                    const datasets = topics.map((t, idx) => ({
+                        label: t,
+                        data: kafkaData.lag[t],
+                        borderColor: palette[idx % palette.length],
+                        backgroundColor: palette[idx % palette.length],
+                        fill: false,
+                        tension: 0.2
+                    }));
+                    window.kafkaLagChart = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels, datasets },
+                        options: {
+                            responsive: true,
+                            plugins: { title: { display: true, text: 'Kafka Lag по топикам' } },
+                            scales: {
+                                x: { title: { display: true, text: 'Замеры' } },
+                                y: { beginAtZero: true, title: { display: true, text: 'Lag' } }
+                            }
+                        }
+                    });
+                }
+
+                function renderKafkaConfig() {
+                    showKafkaDetails();
+                    clearKafkaView();
+                    const head = document.getElementById('kafka-table-head');
+                    const body = document.getElementById('kafka-table-body');
+                    head.innerHTML = `<tr><th>Параметр</th><th>Значение</th></tr>`;
+                    const settings = kafkaData.settings || {};
+                    Object.keys(settings).forEach(k => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${k}</td><td>${settings[k]}</td>`;
+                        body.appendChild(tr);
+                    });
+                }
+
+                // Навешиваем обработчики на подкарточки внутри Kafka (многоуровневый поиск)
+                document.addEventListener('DOMContentLoaded', function() {
+                    const cards = Array.from(document.querySelectorAll('.card.has-children'));
+                    const kafkaCard = cards.find(c => (c.querySelector('.card-title')||{}).textContent && c.querySelector('.card-title').textContent.trim() === 'Kafka');
+                    if (!kafkaCard) return;
+                    // Ищем все подкарточки Kafka на любом уровне вложенности
+                    const allKafkaSubCards = kafkaCard.querySelectorAll('.sub-card');
+                    allKafkaSubCards.forEach(sc => {
+                        const titleEl = sc.querySelector('.sub-card-title');
+                        if (!titleEl) return;
+                        const t = titleEl.textContent.trim();
+                        if (t === 'CPU') { sc.classList.add('clickable'); sc.addEventListener('click', e => { e.stopPropagation(); renderKafkaCpu(); }); }
+                        if (t === 'MEM') { sc.classList.add('clickable'); sc.addEventListener('click', e => { e.stopPropagation(); renderKafkaMem(); }); }
+                        if (t === 'Disk') { sc.classList.add('clickable'); sc.addEventListener('click', e => { e.stopPropagation(); renderKafkaDisk(); }); }
+                        if (t === 'Lag') { sc.classList.add('clickable'); sc.addEventListener('click', e => { e.stopPropagation(); renderKafkaLag(); }); }
+                        if (t === 'Configuration') { sc.classList.add('clickable'); sc.addEventListener('click', e => { e.stopPropagation(); renderKafkaConfig(); }); }
+                    });
+                });
+
+                function showPgDetails() {
+                    const el = document.getElementById('pg-details');
+                    if (el.style.display === 'none') { el.style.display = 'block'; }
+                }
+
+                function clearPgTable() {
+                    const body = document.getElementById('pg-table-body');
+                    body.innerHTML = '';
+                }
+
+                function parseCsv(text) {
+                    const lines = (text || '').split(/\r?\n/).filter(l => l.trim().length > 0);
+                    return lines.map(line => {
+                        const values = []; let current = ''; let inQuotes = false;
+                        for (let i = 0; i < line.length; i++) {
+                            const ch = line[i];
+                            if (ch === '\"') {
+                                if (inQuotes && line[i + 1] === '\"') { current += '\"'; i++; } else { inQuotes = !inQuotes; }
+                            } else if (ch === ',' && !inQuotes) { values.push(current); current = ''; } else { current += ch; }
+                        }
+                        values.push(current);
+                        return values.map(v => v.replace(/^\\"|\\"$/g, ''));
+                    });
+                }
+
+                function renderPgSettingsFromEmbedded() {
+                    showPgDetails();
+                    clearPgTable();
+                    const rows = parseCsv(pgCsvText);
+                    const body = document.getElementById('pg-table-body');
+                    if (!rows || rows.length <= 1) { const tr = document.createElement('tr'); tr.innerHTML = '<td colspan="5">Нет данных в postgre.csv</td>'; body.appendChild(tr); return; }
+                    for (let i = 1; i < rows.length; i++) {
+                        const r = rows[i]; if (!r || r.length < 5) continue;
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3] ?? ''}</td><td>${r[4] ?? ''}</td>`;
+                        body.appendChild(tr);
+                    }
+                }
+
+                // Подключаем обработчик на DB → PG Settings (многоуровневый поиск)
+                document.addEventListener('DOMContentLoaded', function() {
+                    const cards = Array.from(document.querySelectorAll('.card.has-children'));
+                    const dbCard = cards.find(c => (c.querySelector('.card-title')||{}).textContent && c.querySelector('.card-title').textContent.trim() === 'DB');
+                    if (!dbCard) return;
+                    // Ищем PG Settings на любом уровне вложенности
+                    const allSubCards = dbCard.querySelectorAll('.sub-card');
+                    allSubCards.forEach(sc => { 
+                        const titleEl = sc.querySelector('.sub-card-title'); 
+                        if (!titleEl) return; 
+                        const t = titleEl.textContent.trim(); 
+                        if (t === 'PG Settings') { 
+                            sc.classList.add('clickable'); 
+                            sc.title = 'Кликните для просмотра PG Settings'; 
+                            sc.addEventListener('click', e => { e.stopPropagation(); renderPgSettingsFromEmbedded(); }); 
+                        } 
+                    });
+                });
+            </script>
+</body>
+</html>
