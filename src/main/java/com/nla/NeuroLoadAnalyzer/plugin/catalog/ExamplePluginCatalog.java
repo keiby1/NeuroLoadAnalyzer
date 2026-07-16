@@ -8,8 +8,7 @@ import java.util.List;
 
 /**
  * Demo / CI catalog committed to git.
- * For private rules copy {@code LocalPluginCatalog.example.java} → {@code LocalPluginCatalog.java}
- * (the latter is gitignored).
+ * Applies to every request parameter with type prefix {@code VM_*} ({@code $VM} → param value).
  */
 public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 
@@ -17,15 +16,17 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 	public List<AnalysisPlugin> getPlugins() {
 		return List.of(
 				new AnalysisPlugin(
-						"CPU Kafka",
+						"CPU > 80%",
+						"VM",
 						"""
-						100 - (avg(irate(node_cpu_seconds_total{mode="idle", instance=~"$VM_Kafka_GW"}[1m])) by (instance) * 100)
+						100 - (avg(irate(node_cpu_seconds_total{mode="idle", instance=~"$VM"}[1m])) by (instance)*100)
 						""".trim(),
 						ThresholdCondition.greaterThan(80)),
 				new AnalysisPlugin(
-						"RAM Kafka",
+						"RAM > 80%",
+						"VM",
 						"""
-						max(100 * (1 - (node_memory_MemAvailable_bytes{instance=~"$VM_Kafka_GW"} / node_memory_MemTotal_bytes{instance=~"$VM_Kafka_GW"}))) by (instance)
+						max(100*(1-(node_memory_MemAvailable_bytes{instance=~"$VM"} / node_memory_MemTotal_bytes{instance=~"$VM"}))) by (instance)
 						""".trim(),
 						ThresholdCondition.greaterThan(80))
 		);

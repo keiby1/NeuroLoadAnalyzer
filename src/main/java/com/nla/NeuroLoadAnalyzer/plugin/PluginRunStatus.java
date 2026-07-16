@@ -1,12 +1,15 @@
 package com.nla.NeuroLoadAnalyzer.plugin;
 
+/**
+ * User-facing analysis statuses for the HTML report.
+ */
 public enum PluginRunStatus {
-	/** Condition not violated */
+	/** Threshold not exceeded */
 	OK,
-	/** Condition violated (e.g. threshold exceeded) */
-	VIOLATION,
-	/** Required placeholders missing in the request */
-	SKIPPED,
-	/** Transport / query / parse failure */
-	ERROR
+	/** Threshold exceeded (Fail) */
+	FAIL,
+	/** Query succeeded but returned no datapoints */
+	NO_DATA,
+	/** Any error that prevented obtaining data */
+	SKIP
 }

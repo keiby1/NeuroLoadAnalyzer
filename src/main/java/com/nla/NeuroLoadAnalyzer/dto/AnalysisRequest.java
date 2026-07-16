@@ -1,25 +1,27 @@
 package com.nla.NeuroLoadAnalyzer.dto;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 /**
- * Incoming analysis request: Grafana time window + arbitrary variables/filters.
+ * Incoming analysis request: Grafana time window + arbitrary parameters (multi-value aware).
  */
 public final class AnalysisRequest {
 
 	private final Long fromMs;
 	private final Long toMs;
-	private final Map<String, String> variables;
+	private final List<NamedParameter> parameters;
 
-	public AnalysisRequest(Long fromMs, Long toMs, Map<String, String> variables) {
+	public AnalysisRequest(Long fromMs, Long toMs, List<NamedParameter> parameters) {
 		this.fromMs = fromMs;
 		this.toMs = toMs;
-		this.variables = variables == null
-				? Map.of()
-				: Collections.unmodifiableMap(new LinkedHashMap<>(variables));
+		this.parameters = parameters == null
+				? List.of()
+				: Collections.unmodifiableList(new ArrayList<>(parameters));
 	}
 
 	public Long getFromMs() {
@@ -30,13 +32,20 @@ public final class AnalysisRequest {
 		return toMs;
 	}
 
-	/** All query params except {@code from}/{@code to}. */
-	public Map<String, String> getVariables() {
-		return variables;
+	/** All query params except {@code from}/{@code to}; duplicates preserved. */
+	public List<NamedParameter> getParameters() {
+		return parameters;
 	}
 
-	public String getVariable(String name) {
-		return variables.get(name);
+	/**
+	 * Last-wins map view (for simple lookups). Prefer {@link #getParameters()} for analysis.
+	 */
+	public Map<String, String> getVariables() {
+		Map<String, String> map = new LinkedHashMap<>();
+		for (NamedParameter parameter : parameters) {
+			map.put(parameter.name(), parameter.value());
+		}
+		return Collections.unmodifiableMap(map);
 	}
 
 	@Override
@@ -49,16 +58,16 @@ public final class AnalysisRequest {
 		}
 		return Objects.equals(fromMs, that.fromMs)
 				&& Objects.equals(toMs, that.toMs)
-				&& Objects.equals(variables, that.variables);
+				&& Objects.equals(parameters, that.parameters);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(fromMs, toMs, variables);
+		return Objects.hash(fromMs, toMs, parameters);
 	}
 
 	@Override
 	public String toString() {
-		return "AnalysisRequest{fromMs=" + fromMs + ", toMs=" + toMs + ", variables=" + variables + '}';
+		return "AnalysisRequest{fromMs=" + fromMs + ", toMs=" + toMs + ", parameters=" + parameters + '}';
 	}
 }

@@ -1,7 +1,7 @@
 package com.nla.NeuroLoadAnalyzer.service;
 
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisReport;
-import com.nla.NeuroLoadAnalyzer.dto.TypedTarget;
+import com.nla.NeuroLoadAnalyzer.dto.SoftwareReportGroup;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginResult;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginRunStatus;
 import org.springframework.stereotype.Service;
@@ -124,70 +124,59 @@ public class AnalysisPageService {
 	public String renderReport(AnalysisReport report) {
 		StringBuilder html = new StringBuilder();
 		html.append("<style>")
-				.append(".nla-section{margin:0 0 1.5rem}")
-				.append(".nla-section h2{margin:0 0 .6rem;font-size:1.05rem}")
+				.append(".nla-section{margin:0 0 1.75rem}")
+				.append(".nla-section h2{margin:0 0 .55rem;font-size:1.1rem}")
+				.append(".nla-section h3{margin:1rem 0 .45rem;font-size:1rem}")
 				.append(".nla-meta{color:#5c6b7a;font-size:.9rem;margin:0 0 1rem}")
 				.append("table.nla{width:100%;border-collapse:collapse;font-size:.92rem}")
 				.append("table.nla th,table.nla td{border-bottom:1px solid #d5dde6;padding:.55rem .4rem;text-align:left;vertical-align:top}")
 				.append("table.nla th{color:#5c6b7a;font-weight:600}")
 				.append(".badge{display:inline-block;padding:.15rem .5rem;border-radius:999px;font-size:.8rem;font-weight:600}")
 				.append(".badge-ok{background:#e5f6ea;color:#1f7a3f}")
-				.append(".badge-violation{background:#fdecec;color:#9b1c1c}")
-				.append(".badge-skipped{background:#eef1f4;color:#5c6b7a}")
-				.append(".badge-error{background:#fff4e5;color:#9a5b00}")
-				.append("code{font-size:.8rem;word-break:break-all}")
+				.append(".badge-fail{background:#fdecec;color:#9b1c1c}")
+				.append(".badge-nodata{background:#eef1f4;color:#5c6b7a}")
+				.append(".badge-skip{background:#fff4e5;color:#9a5b00}")
+				.append("code{font-size:.78rem;word-break:break-all}")
+				.append(".group{border:1px solid #d5dde6;border-radius:10px;padding:.85rem 1rem;margin:0 0 1rem;background:rgba(255,255,255,.55)}")
 				.append("</style>");
 
-		html.append("<p class=\"nla-meta\">Каталог плагинов: ")
+		html.append("<p class=\"nla-meta\">Каталог: ")
 				.append(esc(report.catalogSource()))
+				.append(" · целей: ")
+				.append(report.typedTargets().size())
+				.append(" · запросов: ")
+				.append(report.pluginResults().size())
 				.append(" · range=")
 				.append(esc(report.timeRange().rangeForPromQl()))
-				.append(" · evalTime=")
-				.append(report.timeRange().evaluationTimeSec() == null ? "now" : report.timeRange().evaluationTimeSec())
 				.append("</p>");
 
-		html.append("<div class=\"nla-section\"><h2>Цели (Тип_Софт_Назначение)</h2>");
-		if (report.typedTargets().isEmpty()) {
-			html.append("<p class=\"nla-meta\">Параметры вида Тип_Софт_Назначение не найдены.</p>");
+		html.append("<div class=\"nla-section\"><h2>Результаты по типу ПО</h2>");
+		if (report.softwareGroups().isEmpty()) {
+			html.append("<p class=\"nla-meta\">Нет параметров вида Тип_Софт_Назначение для анализа.</p>");
 		} else {
-			html.append("<table class=\"nla\"><thead><tr>")
-					.append("<th>Параметр</th><th>Тип</th><th>Софт</th><th>Назначение</th><th>Значение</th>")
-					.append("</tr></thead><tbody>");
-			for (TypedTarget target : report.typedTargets()) {
-				html.append("<tr>")
-						.append("<td>").append(esc(target.canonicalName())).append("</td>")
-						.append("<td>").append(esc(target.type())).append("</td>")
-						.append("<td>").append(esc(target.software())).append("</td>")
-						.append("<td>").append(esc(target.purpose())).append("</td>")
-						.append("<td>").append(esc(target.value())).append("</td>")
-						.append("</tr>");
-			}
-			html.append("</tbody></table>");
-		}
-		html.append("</div>");
-
-		html.append("<div class=\"nla-section\"><h2>Результаты плагинов</h2>");
-		if (report.pluginResults().isEmpty()) {
-			html.append("<p>Тут будет результат</p>");
-		} else {
-			html.append("<table class=\"nla\"><thead><tr>")
-					.append("<th>Правило</th><th>Статус</th><th>Значение</th><th>Условие</th><th>Сообщение</th>")
-					.append("</tr></thead><tbody>");
-			for (PluginResult result : report.pluginResults()) {
-				html.append("<tr>")
-						.append("<td>").append(esc(result.pluginName())).append("</td>")
-						.append("<td>").append(statusBadge(result.status())).append("</td>")
-						.append("<td>")
-						.append(result.metricValue() == null ? "—" : formatNumber(result.metricValue()))
-						.append("</td>")
-						.append("<td>").append(esc(result.conditionDescription())).append("</td>")
-						.append("<td>").append(esc(nullToEmpty(result.message())));
-				if (result.boundQuery() != null && !result.boundQuery().isBlank()) {
-					html.append("<br><code>").append(esc(result.boundQuery())).append("</code>");
+			for (SoftwareReportGroup group : report.softwareGroups()) {
+				html.append("<div class=\"group\">");
+				html.append("<h3>").append(esc(group.software())).append("</h3>");
+				html.append("<table class=\"nla\"><thead><tr>")
+						.append("<th>Параметр</th><th>Значение</th><th>Правило</th><th>Статус</th><th>Значение метрики</th><th>Комментарий</th>")
+						.append("</tr></thead><tbody>");
+				for (PluginResult result : group.results()) {
+					html.append("<tr>")
+							.append("<td>").append(esc(result.parameterName())).append("</td>")
+							.append("<td>").append(esc(result.parameterValue())).append("</td>")
+							.append("<td>").append(esc(result.pluginName())).append("</td>")
+							.append("<td>").append(statusBadge(result.status())).append("</td>")
+							.append("<td>")
+							.append(result.metricValue() == null ? "—" : formatNumber(result.metricValue()))
+							.append("</td>")
+							.append("<td>").append(esc(nullToEmpty(result.message())));
+					if (result.boundQuery() != null && !result.boundQuery().isBlank()) {
+						html.append("<br><code>").append(esc(result.boundQuery())).append("</code>");
+					}
+					html.append("</td></tr>");
 				}
-				html.append("</td></tr>");
+				html.append("</tbody></table></div>");
 			}
-			html.append("</tbody></table>");
 		}
 		html.append("</div>");
 
@@ -197,11 +186,20 @@ public class AnalysisPageService {
 	private static String statusBadge(PluginRunStatus status) {
 		String css = switch (status) {
 			case OK -> "badge-ok";
-			case VIOLATION -> "badge-violation";
-			case SKIPPED -> "badge-skipped";
-			case ERROR -> "badge-error";
+			case FAIL -> "badge-fail";
+			case NO_DATA -> "badge-nodata";
+			case SKIP -> "badge-skip";
 		};
-		return "<span class=\"badge " + css + "\">" + esc(status.name()) + "</span>";
+		return "<span class=\"badge " + css + "\">" + esc(statusLabel(status)) + "</span>";
+	}
+
+	private static String statusLabel(PluginRunStatus status) {
+		return switch (status) {
+			case OK -> "OK";
+			case FAIL -> "Fail";
+			case NO_DATA -> "No Data";
+			case SKIP -> "Skip";
+		};
 	}
 
 	private static String formatNumber(double value) {

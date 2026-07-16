@@ -1,23 +1,25 @@
 package com.nla.NeuroLoadAnalyzer.controller;
 
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisRequest;
+import com.nla.NeuroLoadAnalyzer.dto.NamedParameter;
 import com.nla.NeuroLoadAnalyzer.service.AnalysisPageService;
 import com.nla.NeuroLoadAnalyzer.service.AnalysisService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 /**
  * Entry point for Grafana-style analysis requests.
- * {@code from}/{@code to} are required; any other query params are passed through as variables.
+ * {@code from}/{@code to} are required; any other query params are passed through (multi-value OK).
  */
 @RestController
 public class AnalysisController {
@@ -30,23 +32,16 @@ public class AnalysisController {
 		this.analysisPageService = analysisPageService;
 	}
 
-	/**
-	 * Returns an HTML shell with a loading spinner.
-	 * The page then requests {@code /analyze/result} with the same query string.
-	 */
 	@GetMapping(value = "/analyze", produces = MediaType.TEXT_HTML_VALUE)
-	public ResponseEntity<String> analyzePage(@RequestParam Map<String, String> allParams) {
+	public ResponseEntity<String> analyzePage(@RequestParam MultiValueMap<String, String> allParams) {
 		parseRequest(allParams);
 		return ResponseEntity.ok()
 				.contentType(MediaType.TEXT_HTML)
 				.body(analysisPageService.loadingPage());
 	}
 
-	/**
-	 * Runs analysis and returns the result HTML fragment (stub for now).
-	 */
 	@GetMapping(value = "/analyze/result", produces = MediaType.TEXT_HTML_VALUE)
-	public ResponseEntity<String> analyzeResult(@RequestParam Map<String, String> allParams) {
+	public ResponseEntity<String> analyzeResult(@RequestParam MultiValueMap<String, String> allParams) {
 		AnalysisRequest request = parseRequest(allParams);
 		String html = analysisService.analyze(request);
 		return ResponseEntity.ok()
@@ -54,21 +49,35 @@ public class AnalysisController {
 				.body(html);
 	}
 
-	private AnalysisRequest parseRequest(Map<String, String> allParams) {
+	private AnalysisRequest parseRequest(MultiValueMap<String, String> allParams) {
 		Long fromMs = parseRequiredLong(allParams, "from");
 		Long toMs = parseRequiredLong(allParams, "to");
 		if (toMs <= fromMs) {
 			throw new ResponseStatusException(BAD_REQUEST, "'to' must be greater than 'from'");
 		}
 
-		Map<String, String> variables = new LinkedHashMap<>(allParams);
-		variables.remove("from");
-		variables.remove("to");
-		return new AnalysisRequest(fromMs, toMs, variables);
+		List<NamedParameter> parameters = new ArrayList<>();
+		if (allParams != null) {
+			for (String name : allParams.keySet()) {
+				if ("from".equals(name) || "to".equals(name)) {
+					continue;
+				}
+				List<String> values = allParams.get(name);
+				if (values == null) {
+					continue;
+				}
+				for (String value : values) {
+					if (value != null) {
+						parameters.add(new NamedParameter(name, value));
+					}
+				}
+			}
+		}
+		return new AnalysisRequest(fromMs, toMs, parameters);
 	}
 
-	private static Long parseRequiredLong(Map<String, String> params, String name) {
-		String raw = params.get(name);
+	private static Long parseRequiredLong(MultiValueMap<String, String> params, String name) {
+		String raw = params == null ? null : params.getFirst(name);
 		if (raw == null || raw.isBlank()) {
 			throw new ResponseStatusException(BAD_REQUEST, "Required query parameter '" + name + "' is missing");
 		}
