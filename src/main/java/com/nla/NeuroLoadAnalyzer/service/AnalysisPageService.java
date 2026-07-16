@@ -1,13 +1,17 @@
 package com.nla.NeuroLoadAnalyzer.service;
 
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisReport;
-import com.nla.NeuroLoadAnalyzer.dto.SoftwareReportGroup;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginResult;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginRunStatus;
+import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder.PurposeReportNode;
+import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder.SoftwareReportNode;
+import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder.TypeReportGroup;
+import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder.ValueReportNode;
+import com.nla.NeuroLoadAnalyzer.report.StatusAggregator;
 import org.springframework.stereotype.Service;
 
 /**
- * Builds HTML shell (spinner) and result markup for the analysis flow.
+ * Builds HTML shell (spinner) and hierarchical card report (ExampleReport styles).
  */
 @Service
 public class AnalysisPageService {
@@ -21,38 +25,24 @@ public class AnalysisPageService {
 				<meta name="viewport" content="width=device-width, initial-scale=1">
 				<title>NeuroLoadAnalyzer</title>
 				<style>
-				  :root {
-				    --bg: #f3f5f7;
-				    --ink: #1a2330;
-				    --muted: #5c6b7a;
-				    --ring: #2f6fed;
-				    --track: #d5dde6;
-				  }
-				  * { box-sizing: border-box; }
+				  * { margin: 0; padding: 0; box-sizing: border-box; }
 				  body {
-				    margin: 0;
-				    min-height: 100vh;
-				    font-family: "Segoe UI", system-ui, sans-serif;
-				    color: var(--ink);
-				    background:
-				      radial-gradient(1200px 500px at 10% -10%, #e8eef8 0%, transparent 55%),
-				      radial-gradient(900px 400px at 100% 0%, #e6f0ea 0%, transparent 50%),
-				      var(--bg);
+				    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+				    background-color: #f5f5f5;
+				    padding: 20px;
+				    color: #333;
 				  }
-				  .wrap {
-				    max-width: 960px;
-				    margin: 0 auto;
-				    padding: 2.5rem 1.25rem 3rem;
-				  }
+				  .wrap { max-width: 1200px; margin: 0 auto; }
 				  h1 {
-				    margin: 0 0 0.35rem;
-				    font-size: 1.35rem;
-				    font-weight: 650;
-				    letter-spacing: -0.02em;
+				    text-align: center;
+				    color: #333;
+				    margin-bottom: 12px;
+				    font-size: 2em;
 				  }
 				  .subtitle {
-				    margin: 0 0 2rem;
-				    color: var(--muted);
+				    text-align: center;
+				    color: #666;
+				    margin-bottom: 28px;
 				    font-size: 0.95rem;
 				  }
 				  #status {
@@ -67,21 +57,199 @@ public class AnalysisPageService {
 				    width: 48px;
 				    height: 48px;
 				    border-radius: 50%;
-				    border: 4px solid var(--track);
-				    border-top-color: var(--ring);
+				    border: 4px solid #e0e0e0;
+				    border-top-color: #4CAF50;
 				    animation: spin 0.8s linear infinite;
 				  }
 				  @keyframes spin { to { transform: rotate(360deg); } }
-				  .status-text { color: var(--muted); font-size: 0.95rem; }
+				  .status-text { color: #666; font-size: 0.95rem; }
 				  #result { display: none; }
 				  #result.visible { display: block; }
 				  #status.hidden { display: none; }
 				  .error {
 				    color: #9b1c1c;
-				    background: #fdecec;
-				    border: 1px solid #f3c1c1;
+				    background: #FFEBEE;
+				    border: 1px solid #ffcdd2;
 				    border-radius: 8px;
 				    padding: 0.9rem 1rem;
+				  }
+
+				  .nla-meta { color: #666; font-size: .9rem; margin: 0 0 1.25rem; text-align: center; }
+				  .summary-cards {
+				    display: grid;
+				    grid-template-columns: repeat(4, 1fr);
+				    gap: 16px;
+				    margin-bottom: 24px;
+				  }
+				  @media (max-width: 768px) {
+				    .summary-cards { grid-template-columns: repeat(2, 1fr); }
+				  }
+				  .summary-card {
+				    background: white;
+				    border-radius: 12px;
+				    padding: 18px 16px;
+				    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+				    border-left: 5px solid;
+				    text-align: center;
+				  }
+				  .summary-card.green {
+				    border-left-color: #4CAF50;
+				    background: linear-gradient(135deg, #E8F5E8 0%, #F1F8E9 100%);
+				  }
+				  .summary-card.red {
+				    border-left-color: #F44336;
+				    background: linear-gradient(135deg, #FFEBEE 0%, #FCE4EC 100%);
+				  }
+				  .summary-card.yellow {
+				    border-left-color: #FF9800;
+				    background: linear-gradient(135deg, #FFF8E1 0%, #FFF3E0 100%);
+				  }
+				  .summary-card.gray {
+				    border-left-color: #9E9E9E;
+				    background: linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%);
+				  }
+				  .summary-card-title {
+				    font-size: 0.95em;
+				    font-weight: 600;
+				    color: #555;
+				    margin-bottom: 8px;
+				  }
+				  .summary-card-count {
+				    font-size: 2em;
+				    font-weight: 700;
+				    color: #333;
+				    line-height: 1.1;
+				  }
+				  .type-group { margin-bottom: 24px; }
+				  .cards-container {
+				    display: grid;
+				    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+				    gap: 20px;
+				    margin-bottom: 20px;
+				  }
+				  .card {
+				    background: white;
+				    border-radius: 12px;
+				    padding: 20px;
+				    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+				    cursor: pointer;
+				    transition: all 0.3s ease;
+				    border-left: 5px solid;
+				    position: relative;
+				  }
+				  .card:hover {
+				    transform: translateY(-2px);
+				    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+				  }
+				  .card.green {
+				    border-left-color: #4CAF50;
+				    background: linear-gradient(135deg, #E8F5E8 0%, #F1F8E9 100%);
+				  }
+				  .card.red {
+				    border-left-color: #F44336;
+				    background: linear-gradient(135deg, #FFEBEE 0%, #FCE4EC 100%);
+				  }
+				  .card.yellow {
+				    border-left-color: #FF9800;
+				    background: linear-gradient(135deg, #FFF8E1 0%, #FFF3E0 100%);
+				  }
+				  .card.gray {
+				    border-left-color: #9E9E9E;
+				    background: linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%);
+				  }
+				  .card-title {
+				    font-size: 1.35em;
+				    font-weight: bold;
+				    margin-bottom: 10px;
+				    color: #333;
+				    padding-right: 28px;
+				  }
+				  .card-content { color: #666; font-size: 0.9em; }
+				  .card.has-children::after {
+				    content: '▶';
+				    position: absolute;
+				    right: 20px;
+				    top: 28px;
+				    font-size: 1.1em;
+				    color: #999;
+				    transition: transform 0.3s ease;
+				  }
+				  .card.expanded::after { transform: rotate(90deg); }
+				  .sub-cards {
+				    display: none;
+				    margin-top: 15px;
+				    padding-left: 20px;
+				    border-left: 2px solid #e0e0e0;
+				  }
+				  .sub-cards.show { display: block; }
+				  .sub-card {
+				    background: #fafafa;
+				    border-radius: 8px;
+				    padding: 15px;
+				    margin-bottom: 10px;
+				    border-left: 3px solid;
+				    transition: all 0.3s ease;
+				    position: relative;
+				  }
+				  .sub-card:hover { background: #f0f0f0; }
+				  .sub-card.has-children { cursor: pointer; }
+				  .sub-card.has-children:hover {
+				    background: #e3f2fd;
+				    transform: translateX(5px);
+				    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+				  }
+				  .sub-card.green { border-left-color: #4CAF50; }
+				  .sub-card.red { border-left-color: #F44336; }
+				  .sub-card.yellow { border-left-color: #FF9800; }
+				  .sub-card.gray { border-left-color: #9E9E9E; }
+				  .sub-card-title {
+				    font-weight: bold;
+				    margin-bottom: 5px;
+				    color: #333;
+				    padding-right: 24px;
+				  }
+				  .sub-card-value { color: #666; font-size: 0.9em; }
+				  .sub-card.has-children::after {
+				    content: '▶';
+				    position: absolute;
+				    right: 14px;
+				    top: 16px;
+				    color: #999;
+				    transition: transform 0.3s ease;
+				  }
+				  .sub-card.expanded::after { transform: rotate(90deg); }
+				  .status-indicator {
+				    display: inline-block;
+				    width: 12px;
+				    height: 12px;
+				    border-radius: 50%;
+				    margin-right: 8px;
+				  }
+				  .status-indicator.green { background-color: #4CAF50; }
+				  .status-indicator.red { background-color: #F44336; }
+				  .status-indicator.yellow { background-color: #FF9800; }
+				  .status-indicator.gray { background-color: #9E9E9E; }
+				  .status-label {
+				    display: inline-block;
+				    margin-left: 8px;
+				    font-size: 0.8em;
+				    font-weight: 600;
+				    color: #666;
+				  }
+				  .rule-line {
+				    margin-top: 6px;
+				    padding: 8px 10px;
+				    background: white;
+				    border-radius: 6px;
+				    border: 1px solid #eee;
+				    font-size: 0.85em;
+				  }
+				  .rule-line code {
+				    display: block;
+				    margin-top: 4px;
+				    font-size: 0.75em;
+				    color: #888;
+				    word-break: break-all;
 				  }
 				</style>
 				</head>
@@ -96,6 +264,30 @@ public class AnalysisPageService {
 				  <div id="result"></div>
 				</div>
 				<script>
+				function toggleNlaCard(card) {
+				  const subCards = card.querySelector(':scope > .sub-cards');
+				  if (!subCards) return;
+				  if (subCards.classList.contains('show')) {
+				    subCards.classList.remove('show');
+				    card.classList.remove('expanded');
+				  } else {
+				    subCards.classList.add('show');
+				    card.classList.add('expanded');
+				  }
+				}
+				function initNlaReportCards(root) {
+				  if (!root) return;
+				  root.querySelectorAll('.card.has-children, .sub-card.has-children').forEach(card => {
+				    card.addEventListener('click', function(e) {
+				      const subCards = card.querySelector(':scope > .sub-cards');
+				      const isClickOnSubCards = subCards && subCards.contains(e.target);
+				      if (!isClickOnSubCards) {
+				        e.stopPropagation();
+				        toggleNlaCard(card);
+				      }
+				    });
+				  });
+				}
 				(async function () {
 				  const statusEl = document.getElementById('status');
 				  const resultEl = document.getElementById('result');
@@ -110,6 +302,7 @@ public class AnalysisPageService {
 				    resultEl.innerHTML = html;
 				    statusEl.classList.add('hidden');
 				    resultEl.classList.add('visible');
+				    initNlaReportCards(resultEl);
 				  } catch (e) {
 				    statusEl.innerHTML = '<div class="error">Не удалось выполнить анализ: '
 				      + (e && e.message ? e.message : e) + '</div>';
@@ -123,83 +316,181 @@ public class AnalysisPageService {
 
 	public String renderReport(AnalysisReport report) {
 		StringBuilder html = new StringBuilder();
-		html.append("<style>")
-				.append(".nla-section{margin:0 0 1.75rem}")
-				.append(".nla-section h2{margin:0 0 .55rem;font-size:1.1rem}")
-				.append(".nla-section h3{margin:1rem 0 .45rem;font-size:1rem}")
-				.append(".nla-meta{color:#5c6b7a;font-size:.9rem;margin:0 0 1rem}")
-				.append("table.nla{width:100%;border-collapse:collapse;font-size:.92rem}")
-				.append("table.nla th,table.nla td{border-bottom:1px solid #d5dde6;padding:.55rem .4rem;text-align:left;vertical-align:top}")
-				.append("table.nla th{color:#5c6b7a;font-weight:600}")
-				.append(".badge{display:inline-block;padding:.15rem .5rem;border-radius:999px;font-size:.8rem;font-weight:600}")
-				.append(".badge-ok{background:#e5f6ea;color:#1f7a3f}")
-				.append(".badge-fail{background:#fdecec;color:#9b1c1c}")
-				.append(".badge-nodata{background:#eef1f4;color:#5c6b7a}")
-				.append(".badge-skip{background:#fff4e5;color:#9a5b00}")
-				.append("code{font-size:.78rem;word-break:break-all}")
-				.append(".group{border:1px solid #d5dde6;border-radius:10px;padding:.85rem 1rem;margin:0 0 1rem;background:rgba(255,255,255,.55)}")
-				.append("</style>");
-
 		html.append("<p class=\"nla-meta\">Каталог: ")
 				.append(esc(report.catalogSource()))
 				.append(" · целей: ")
 				.append(report.typedTargets().size())
-				.append(" · запросов: ")
+				.append(" · проверок: ")
 				.append(report.pluginResults().size())
 				.append(" · range=")
 				.append(esc(report.timeRange().rangeForPromQl()))
 				.append("</p>");
 
-		html.append("<div class=\"nla-section\"><h2>Результаты по типу ПО</h2>");
-		if (report.softwareGroups().isEmpty()) {
+		appendSummaryCards(html, report.pluginResults());
+
+		if (report.typeGroups().isEmpty()) {
 			html.append("<p class=\"nla-meta\">Нет параметров вида Тип_Софт_Назначение для анализа.</p>");
-		} else {
-			for (SoftwareReportGroup group : report.softwareGroups()) {
-				html.append("<div class=\"group\">");
-				html.append("<h3>").append(esc(group.software())).append("</h3>");
-				html.append("<table class=\"nla\"><thead><tr>")
-						.append("<th>Параметр</th><th>Значение</th><th>Правило</th><th>Статус</th><th>Значение метрики</th><th>Комментарий</th>")
-						.append("</tr></thead><tbody>");
-				for (PluginResult result : group.results()) {
-					html.append("<tr>")
-							.append("<td>").append(esc(result.parameterName())).append("</td>")
-							.append("<td>").append(esc(result.parameterValue())).append("</td>")
-							.append("<td>").append(esc(result.pluginName())).append("</td>")
-							.append("<td>").append(statusBadge(result.status())).append("</td>")
-							.append("<td>")
-							.append(result.metricValue() == null ? "—" : formatNumber(result.metricValue()))
-							.append("</td>")
-							.append("<td>").append(esc(nullToEmpty(result.message())));
-					if (result.boundQuery() != null && !result.boundQuery().isBlank()) {
-						html.append("<br><code>").append(esc(result.boundQuery())).append("</code>");
-					}
-					html.append("</td></tr>");
-				}
-				html.append("</tbody></table></div>");
-			}
+			return html.toString();
 		}
-		html.append("</div>");
+
+		for (TypeReportGroup typeGroup : report.typeGroups()) {
+			String typeCss = StatusAggregator.cssClass(typeGroup.status());
+			html.append("<div class=\"type-group\">");
+			html.append("<div class=\"card ").append(typeCss).append(" has-children\">");
+			html.append("<div class=\"card-title\">")
+					.append(indicator(typeGroup.status()))
+					.append(esc(typeGroup.displayName()))
+					.append(statusLabel(typeGroup.status()))
+					.append("</div>");
+			html.append("<div class=\"card-content\">")
+					.append(typeGroup.softwares().size())
+					.append(plural(typeGroup.softwares().size(), " тип ПО", " типа ПО", " типов ПО"))
+					.append("</div>");
+
+			html.append("<div class=\"sub-cards\"><div class=\"cards-container\">");
+			for (SoftwareReportNode software : typeGroup.softwares()) {
+				appendSoftwareCard(html, software);
+			}
+			html.append("</div></div>"); // cards-container, sub-cards
+			html.append("</div></div>"); // card, type-group
+		}
 
 		return html.toString();
 	}
 
-	private static String statusBadge(PluginRunStatus status) {
-		String css = switch (status) {
-			case OK -> "badge-ok";
-			case FAIL -> "badge-fail";
-			case NO_DATA -> "badge-nodata";
-			case SKIP -> "badge-skip";
-		};
-		return "<span class=\"badge " + css + "\">" + esc(statusLabel(status)) + "</span>";
+	private void appendSummaryCards(StringBuilder html, java.util.List<PluginResult> results) {
+		int fail = 0;
+		int noData = 0;
+		int skip = 0;
+		int ok = 0;
+		if (results != null) {
+			for (PluginResult result : results) {
+				if (result == null || result.status() == null) {
+					continue;
+				}
+				switch (result.status()) {
+					case FAIL -> fail++;
+					case NO_DATA -> noData++;
+					case SKIP -> skip++;
+					case OK -> ok++;
+				}
+			}
+		}
+
+		html.append("<div class=\"summary-cards\">");
+		appendSummaryCard(html, PluginRunStatus.FAIL, fail);
+		appendSummaryCard(html, PluginRunStatus.NO_DATA, noData);
+		appendSummaryCard(html, PluginRunStatus.SKIP, skip);
+		appendSummaryCard(html, PluginRunStatus.OK, ok);
+		html.append("</div>");
+	}
+
+	private static void appendSummaryCard(StringBuilder html, PluginRunStatus status, int count) {
+		html.append("<div class=\"summary-card ").append(StatusAggregator.cssClass(status)).append("\">")
+				.append("<div class=\"summary-card-title\">")
+				.append(indicator(status))
+				.append(esc(StatusAggregator.label(status)))
+				.append("</div>")
+				.append("<div class=\"summary-card-count\">").append(count).append("</div>")
+				.append("</div>");
+	}
+
+	private void appendSoftwareCard(StringBuilder html, SoftwareReportNode software) {
+		String css = StatusAggregator.cssClass(software.status());
+		html.append("<div class=\"card ").append(css).append(" has-children\">");
+		html.append("<div class=\"card-title\">")
+				.append(indicator(software.status()))
+				.append(esc(software.software()))
+				.append(statusLabel(software.status()))
+				.append("</div>");
+		html.append("<div class=\"card-content\">")
+				.append(software.purposes().size())
+				.append(plural(software.purposes().size(), " назначение", " назначения", " назначений"))
+				.append("</div>");
+		html.append("<div class=\"sub-cards\">");
+		for (PurposeReportNode purpose : software.purposes()) {
+			appendPurposeCard(html, purpose);
+		}
+		html.append("</div></div>");
+	}
+
+	private void appendPurposeCard(StringBuilder html, PurposeReportNode purpose) {
+		String css = StatusAggregator.cssClass(purpose.status());
+		html.append("<div class=\"sub-card ").append(css).append(" has-children\">");
+		html.append("<div class=\"sub-card-title\">")
+				.append(indicator(purpose.status()))
+				.append(esc(purpose.purpose()))
+				.append(statusLabel(purpose.status()))
+				.append("</div>");
+		html.append("<div class=\"sub-card-value\">")
+				.append(purpose.values().size())
+				.append(plural(purpose.values().size(), " значение", " значения", " значений"))
+				.append("</div>");
+		html.append("<div class=\"sub-cards\">");
+		for (ValueReportNode value : purpose.values()) {
+			appendValueCard(html, value);
+		}
+		html.append("</div></div>");
+	}
+
+	private void appendValueCard(StringBuilder html, ValueReportNode value) {
+		String css = StatusAggregator.cssClass(value.status());
+		html.append("<div class=\"sub-card ").append(css).append(" has-children\">");
+		html.append("<div class=\"sub-card-title\">")
+				.append(indicator(value.status()))
+				.append(esc(value.parameterValue()))
+				.append(statusLabel(value.status()))
+				.append("</div>");
+		html.append("<div class=\"sub-card-value\">")
+				.append(esc(value.parameterName()))
+				.append("</div>");
+		html.append("<div class=\"sub-cards\">");
+		for (PluginResult result : value.results()) {
+			String ruleCss = StatusAggregator.cssClass(result.status());
+			html.append("<div class=\"sub-card ").append(ruleCss).append("\">");
+			html.append("<div class=\"sub-card-title\">")
+					.append(indicator(result.status()))
+					.append(esc(result.pluginName()))
+					.append(statusLabel(result.status()))
+					.append("</div>");
+			html.append("<div class=\"sub-card-value\">");
+			if (result.metricValue() != null) {
+				html.append("значение: ").append(formatNumber(result.metricValue()))
+						.append(" · условие: ").append(esc(result.conditionDescription()));
+			} else {
+				html.append(esc(nullToEmpty(result.message())));
+			}
+			if (result.boundQuery() != null && !result.boundQuery().isBlank()) {
+				html.append("<div class=\"rule-line\"><code>")
+						.append(esc(result.boundQuery()))
+						.append("</code></div>");
+			}
+			html.append("</div></div>");
+		}
+		html.append("</div></div>");
+	}
+
+	private static String indicator(PluginRunStatus status) {
+		return "<span class=\"status-indicator " + StatusAggregator.cssClass(status) + "\"></span>";
 	}
 
 	private static String statusLabel(PluginRunStatus status) {
-		return switch (status) {
-			case OK -> "OK";
-			case FAIL -> "Fail";
-			case NO_DATA -> "No Data";
-			case SKIP -> "Skip";
-		};
+		return "<span class=\"status-label\">" + esc(StatusAggregator.label(status)) + "</span>";
+	}
+
+	private static String plural(int n, String one, String few, String many) {
+		int nAbs = Math.abs(n) % 100;
+		int n1 = nAbs % 10;
+		if (nAbs > 10 && nAbs < 20) {
+			return many;
+		}
+		if (n1 > 1 && n1 < 5) {
+			return few;
+		}
+		if (n1 == 1) {
+			return one;
+		}
+		return many;
 	}
 
 	private static String formatNumber(double value) {

@@ -4,21 +4,19 @@ import com.nla.NeuroLoadAnalyzer.config.VictoriaMetricsProperties;
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisReport;
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisRequest;
 import com.nla.NeuroLoadAnalyzer.dto.NamedParameter;
-import com.nla.NeuroLoadAnalyzer.dto.SoftwareReportGroup;
 import com.nla.NeuroLoadAnalyzer.dto.TypedTarget;
 import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPluginCatalog;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginAnalysisService;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginResult;
 import com.nla.NeuroLoadAnalyzer.plugin.catalog.ExamplePluginCatalog;
+import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder;
+import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder.TypeReportGroup;
 import com.nla.NeuroLoadAnalyzer.util.TimeRange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -59,19 +57,19 @@ public class AnalysisService {
 		logVmPrefixParameters(typedTargets);
 
 		List<PluginResult> pluginResults = pluginAnalysisService.runAll(request, timeRange);
-		List<SoftwareReportGroup> groups = groupBySoftware(pluginResults);
+		List<TypeReportGroup> typeGroups = ReportTreeBuilder.build(pluginResults);
 		String catalogSource = pluginCatalog instanceof ExamplePluginCatalog
 				? "ExamplePluginCatalog"
 				: pluginCatalog.getClass().getSimpleName();
 
-		log.info("Analysis complete: typedTargets={}, pluginRuns={}, softwareGroups={}, catalog={}",
-				typedTargets.size(), pluginResults.size(), groups.size(), catalogSource);
+		log.info("Analysis complete: typedTargets={}, pluginRuns={}, typeGroups={}, catalog={}",
+				typedTargets.size(), pluginResults.size(), typeGroups.size(), catalogSource);
 
 		AnalysisReport report = new AnalysisReport(
 				timeRange,
 				typedTargets,
 				pluginResults,
-				groups,
+				typeGroups,
 				catalogSource);
 
 		return analysisPageService.renderReport(report);
@@ -97,20 +95,5 @@ public class AnalysisService {
 				.map(t -> t.canonicalName() + "=" + t.value())
 				.collect(Collectors.joining(", "));
 		log.info("VM_ prefix parameters: count={}, [{}]", vmTargets.size(), formatted);
-	}
-
-	static List<SoftwareReportGroup> groupBySoftware(List<PluginResult> results) {
-		Map<String, List<PluginResult>> bySoftware = new LinkedHashMap<>();
-		for (PluginResult result : results) {
-			String software = result.software() == null || result.software().isBlank()
-					? "unknown"
-					: result.software();
-			bySoftware.computeIfAbsent(software, key -> new ArrayList<>()).add(result);
-		}
-		List<SoftwareReportGroup> groups = new ArrayList<>();
-		for (Map.Entry<String, List<PluginResult>> entry : bySoftware.entrySet()) {
-			groups.add(new SoftwareReportGroup(entry.getKey(), List.copyOf(entry.getValue())));
-		}
-		return List.copyOf(groups);
 	}
 }
