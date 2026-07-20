@@ -8,6 +8,8 @@ public class VictoriaMetricsProperties {
 	private String baseUrl = "http://localhost:8428";
 	private String timeRange = "1h";
 	private String subqueryStep = "1m";
+	private String cpuRateWindow = "5m";
+	private String aggregationMethod = "sum_then_percent";
 	private long connectTimeoutMs = 5_000;
 	private long readTimeoutMs = 30_000;
 
@@ -36,6 +38,22 @@ public class VictoriaMetricsProperties {
 
 	public void setSubqueryStep(String subqueryStep) {
 		this.subqueryStep = subqueryStep;
+	}
+
+	public String getCpuRateWindow() {
+		return cpuRateWindow;
+	}
+
+	public void setCpuRateWindow(String cpuRateWindow) {
+		this.cpuRateWindow = cpuRateWindow;
+	}
+
+	public String getAggregationMethod() {
+		return aggregationMethod;
+	}
+
+	public void setAggregationMethod(String aggregationMethod) {
+		this.aggregationMethod = aggregationMethod;
 	}
 
 	public long getConnectTimeoutMs() {

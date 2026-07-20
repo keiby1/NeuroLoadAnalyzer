@@ -42,4 +42,32 @@ class RequestVariableParserTest {
 		assertEquals("server2", targets.get(1).value());
 		assertEquals("Postgre", targets.get(2).software());
 	}
+
+	@Test
+	void extractsMultipleK8sNamespacesFromValuesInOrder() {
+		List<NamedParameter> params = List.of(
+				new NamedParameter("var-k8s_namespace", "payments"),
+				new NamedParameter("k8s_namespace", "orders"),
+				new NamedParameter("k8s_namespace", "payments"),
+				new NamedParameter("k8s_namespace", "  "),
+				new NamedParameter("VM_Kafka_GW", "host"),
+				new NamedParameter("custom", "x"));
+
+		var namespaces = parser.extractK8sNamespaces(params);
+
+		assertEquals(2, namespaces.size());
+		assertEquals("payments", namespaces.get(0).namespace());
+		assertEquals("orders", namespaces.get(1).namespace());
+	}
+
+	@Test
+	void extractsK8sNamespaceWithUnderscoresInValue() {
+		List<NamedParameter> params = List.of(
+				new NamedParameter("k8s_namespace", "my_team_ns"));
+
+		var namespaces = parser.extractK8sNamespaces(params);
+
+		assertEquals(1, namespaces.size());
+		assertEquals("my_team_ns", namespaces.get(0).namespace());
+	}
 }

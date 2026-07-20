@@ -3,6 +3,7 @@ package com.nla.NeuroLoadAnalyzer.service;
 import com.nla.NeuroLoadAnalyzer.config.VictoriaMetricsProperties;
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisReport;
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisRequest;
+import com.nla.NeuroLoadAnalyzer.dto.K8sNamespaceTarget;
 import com.nla.NeuroLoadAnalyzer.dto.NamedParameter;
 import com.nla.NeuroLoadAnalyzer.dto.TypedTarget;
 import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPluginCatalog;
@@ -54,7 +55,9 @@ public class AnalysisService {
 
 		logIncomingParameters(request);
 		List<TypedTarget> typedTargets = requestVariableParser.extractTypedTargets(request.getParameters());
+		List<K8sNamespaceTarget> k8sNamespaces = requestVariableParser.extractK8sNamespaces(request.getParameters());
 		logVmPrefixParameters(typedTargets);
+		logK8sNamespaces(k8sNamespaces);
 
 		List<PluginResult> pluginResults = pluginAnalysisService.runAll(request, timeRange);
 		List<TypeReportGroup> typeGroups = ReportTreeBuilder.build(pluginResults);
@@ -62,8 +65,8 @@ public class AnalysisService {
 				? "ExamplePluginCatalog"
 				: pluginCatalog.getClass().getSimpleName();
 
-		log.info("Analysis complete: typedTargets={}, pluginRuns={}, typeGroups={}, catalog={}",
-				typedTargets.size(), pluginResults.size(), typeGroups.size(), catalogSource);
+		log.info("Analysis complete: typedTargets={}, k8sNamespaces={}, pluginRuns={}, typeGroups={}, catalog={}",
+				typedTargets.size(), k8sNamespaces.size(), pluginResults.size(), typeGroups.size(), catalogSource);
 
 		AnalysisReport report = new AnalysisReport(
 				timeRange,
@@ -95,5 +98,12 @@ public class AnalysisService {
 				.map(t -> t.canonicalName() + "=" + t.value())
 				.collect(Collectors.joining(", "));
 		log.info("VM_ prefix parameters: count={}, [{}]", vmTargets.size(), formatted);
+	}
+
+	private void logK8sNamespaces(List<K8sNamespaceTarget> namespaces) {
+		String formatted = namespaces.stream()
+				.map(K8sNamespaceTarget::namespace)
+				.collect(Collectors.joining(", "));
+		log.info("k8s_ namespace parameters: count={}, [{}]", namespaces.size(), formatted);
 	}
 }

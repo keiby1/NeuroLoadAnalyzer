@@ -450,11 +450,12 @@ public class AnalysisPageService {
 		appendSummaryCards(html, report.pluginResults());
 
 		if (report.typeGroups().isEmpty()) {
-			html.append("<p class=\"nla-meta\">Нет параметров вида Тип_Софт_Назначение для анализа.</p>");
+			html.append("<p class=\"nla-meta\">Нет параметров вида Тип_Софт_Назначение или k8s_namespace для анализа.</p>");
 			return html.toString();
 		}
 
 		for (TypeReportGroup typeGroup : report.typeGroups()) {
+			boolean k8s = isK8s(typeGroup.typePrefix());
 			String typeCss = StatusAggregator.cssClass(typeGroup.status());
 			html.append("<div class=\"type-group\">");
 			html.append("<div class=\"card ").append(typeCss).append(" has-children\">");
@@ -465,12 +466,14 @@ public class AnalysisPageService {
 					.append("</div>");
 			html.append("<div class=\"card-content\">")
 					.append(typeGroup.softwares().size())
-					.append(plural(typeGroup.softwares().size(), " тип ПО", " типа ПО", " типов ПО"))
+					.append(k8s
+							? plural(typeGroup.softwares().size(), " неймспейс", " неймспейса", " неймспейсов")
+							: plural(typeGroup.softwares().size(), " тип ПО", " типа ПО", " типов ПО"))
 					.append("</div>");
 
 			html.append("<div class=\"sub-cards\"><div class=\"cards-container\">");
 			for (SoftwareReportNode software : typeGroup.softwares()) {
-				appendSoftwareCard(html, software);
+				appendSoftwareCard(html, software, typeGroup.typePrefix());
 			}
 			html.append("</div></div>"); // cards-container, sub-cards
 			html.append("</div></div>"); // card, type-group
@@ -519,7 +522,8 @@ public class AnalysisPageService {
 				.append("</div>");
 	}
 
-	private void appendSoftwareCard(StringBuilder html, SoftwareReportNode software) {
+	private void appendSoftwareCard(StringBuilder html, SoftwareReportNode software, String typePrefix) {
+		boolean k8s = isK8s(typePrefix);
 		String css = StatusAggregator.cssClass(software.status());
 		html.append("<div class=\"card ").append(css).append(" has-children\">");
 		html.append("<div class=\"card-title\">")
@@ -529,7 +533,9 @@ public class AnalysisPageService {
 				.append("</div>");
 		html.append("<div class=\"card-content\">")
 				.append(software.purposes().size())
-				.append(plural(software.purposes().size(), " назначение", " назначения", " назначений"))
+				.append(k8s
+						? plural(software.purposes().size(), " деплоймент", " деплоймента", " деплойментов")
+						: plural(software.purposes().size(), " назначение", " назначения", " назначений"))
 				.append("</div>");
 		html.append("<div class=\"sub-cards\">");
 		for (PurposeReportNode purpose : software.purposes()) {
@@ -539,6 +545,7 @@ public class AnalysisPageService {
 	}
 
 	private void appendPurposeCard(StringBuilder html, PurposeReportNode purpose) {
+		boolean flattenValues = purpose.values().stream().allMatch(AnalysisPageService::isBlankValueNode);
 		String css = StatusAggregator.cssClass(purpose.status());
 		html.append("<div class=\"sub-card ").append(css).append(" has-children\">");
 		html.append("<div class=\"sub-card-title\">")
@@ -546,6 +553,21 @@ public class AnalysisPageService {
 				.append(esc(purpose.purpose()))
 				.append(statusLabel(purpose.status()))
 				.append("</div>");
+		if (flattenValues) {
+			int checkCount = purpose.values().stream().mapToInt(v -> v.results().size()).sum();
+			html.append("<div class=\"sub-card-value\">")
+					.append(checkCount)
+					.append(plural(checkCount, " проверка", " проверки", " проверок"))
+					.append("</div>");
+			html.append("<div class=\"sub-cards\">");
+			for (ValueReportNode value : purpose.values()) {
+				for (PluginResult result : value.results()) {
+					appendMetricCard(html, result);
+				}
+			}
+			html.append("</div></div>");
+			return;
+		}
 		html.append("<div class=\"sub-card-value\">")
 				.append(purpose.values().size())
 				.append(plural(purpose.values().size(), " значение", " значения", " значений"))
@@ -570,48 +592,60 @@ public class AnalysisPageService {
 				.append("</div>");
 		html.append("<div class=\"sub-cards\">");
 		for (PluginResult result : value.results()) {
-			String ruleCss = StatusAggregator.cssClass(result.status());
-			html.append("<div class=\"sub-card metric-detail-card ").append(ruleCss).append("\">");
-			html.append("<div class=\"sub-card-title\">")
-					.append(indicator(result.status()))
-					.append(esc(result.pluginName()))
-					.append(statusLabel(result.status()))
-					.append("</div>");
-			html.append("<div class=\"sub-card-value\">");
-			if (result.slopePctPerHour() != null || result.deltaAbsBytes() != null) {
-				html.append(esc(nullToEmpty(result.message())));
-				html.append("<div class=\"rule-line\">");
-				if (result.slopePctPerHour() != null) {
-					html.append("slope: ").append(formatNumber(result.slopePctPerHour())).append("%/ч");
-					if (result.slopeBytesPerHour() != null) {
-						html.append(" (").append(formatNumber(result.slopeBytesPerHour() / (1024 * 1024)))
-								.append(" МиБ/ч)");
-					}
-				}
-				if (result.deltaAbsBytes() != null) {
-					if (result.slopePctPerHour() != null) {
-						html.append(" · ");
-					}
-					html.append("Δ: ").append(formatNumber(result.deltaAbsBytes() / (1024 * 1024))).append(" МиБ");
-					if (result.deltaPct() != null) {
-						html.append(" (").append(formatNumber(result.deltaPct())).append("%)");
-					}
-				}
-				html.append("</div>");
-			} else if (result.metricValue() != null) {
-				html.append("значение: ").append(formatNumber(result.metricValue()))
-						.append(" · условие: ").append(esc(result.conditionDescription()));
-			} else {
-				html.append(esc(nullToEmpty(result.message())));
-			}
-			if (result.boundQuery() != null && !result.boundQuery().isBlank()) {
-				html.append("<div class=\"rule-line\"><code>")
-						.append(esc(result.boundQuery()))
-						.append("</code></div>");
-			}
-			html.append("</div></div>");
+			appendMetricCard(html, result);
 		}
 		html.append("</div></div>");
+	}
+
+	private void appendMetricCard(StringBuilder html, PluginResult result) {
+		String ruleCss = StatusAggregator.cssClass(result.status());
+		html.append("<div class=\"sub-card metric-detail-card ").append(ruleCss).append("\">");
+		html.append("<div class=\"sub-card-title\">")
+				.append(indicator(result.status()))
+				.append(esc(result.pluginName()))
+				.append(statusLabel(result.status()))
+				.append("</div>");
+		html.append("<div class=\"sub-card-value\">");
+		if (result.slopePctPerHour() != null || result.deltaAbsBytes() != null) {
+			html.append(esc(nullToEmpty(result.message())));
+			html.append("<div class=\"rule-line\">");
+			if (result.slopePctPerHour() != null) {
+				html.append("slope: ").append(formatNumber(result.slopePctPerHour())).append("%/ч");
+				if (result.slopeBytesPerHour() != null) {
+					html.append(" (").append(formatNumber(result.slopeBytesPerHour() / (1024 * 1024)))
+							.append(" МиБ/ч)");
+				}
+			}
+			if (result.deltaAbsBytes() != null) {
+				if (result.slopePctPerHour() != null) {
+					html.append(" · ");
+				}
+				html.append("Δ: ").append(formatNumber(result.deltaAbsBytes() / (1024 * 1024))).append(" МиБ");
+				if (result.deltaPct() != null) {
+					html.append(" (").append(formatNumber(result.deltaPct())).append("%)");
+				}
+			}
+			html.append("</div>");
+		} else if (result.metricValue() != null) {
+			html.append("значение: ").append(formatNumber(result.metricValue()))
+					.append(" · условие: ").append(esc(result.conditionDescription()));
+		} else {
+			html.append(esc(nullToEmpty(result.message())));
+		}
+		if (result.boundQuery() != null && !result.boundQuery().isBlank()) {
+			html.append("<div class=\"rule-line\"><code>")
+					.append(esc(result.boundQuery()))
+					.append("</code></div>");
+		}
+		html.append("</div></div>");
+	}
+
+	private static boolean isK8s(String typePrefix) {
+		return typePrefix != null && "K8S".equalsIgnoreCase(typePrefix.trim());
+	}
+
+	private static boolean isBlankValueNode(ValueReportNode value) {
+		return value.parameterValue() == null || value.parameterValue().isBlank();
 	}
 
 	private static String formatTimeWindow(com.nla.NeuroLoadAnalyzer.util.TimeRange timeRange) {

@@ -2,9 +2,12 @@ package com.nla.NeuroLoadAnalyzer.plugin;
 
 import com.nla.NeuroLoadAnalyzer.client.VictoriaMetricsClient;
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisRequest;
+import com.nla.NeuroLoadAnalyzer.dto.K8sNamespaceTarget;
 import com.nla.NeuroLoadAnalyzer.dto.PrometheusResponse;
 import com.nla.NeuroLoadAnalyzer.dto.TypedTarget;
+import com.nla.NeuroLoadAnalyzer.dto.k8s.K8sWorkload;
 import com.nla.NeuroLoadAnalyzer.service.RequestVariableParser;
+import com.nla.NeuroLoadAnalyzer.service.k8s.K8sWorkloadService;
 import com.nla.NeuroLoadAnalyzer.util.TimeRange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +21,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Runs each applicable plugin against every matching typed target (e.g. all {@code VM_*} params).
+ * Runs VM plugins (PromQL) and K8S plugins (inventory + threshold on workload metrics).
  */
 @Service
 public class PluginAnalysisService {
@@ -28,23 +31,42 @@ public class PluginAnalysisService {
 	private final AnalysisPluginCatalog pluginCatalog;
 	private final RequestVariableParser variableParser;
 	private final VictoriaMetricsClient victoriaMetricsClient;
+	private final K8sWorkloadService k8sWorkloadService;
 
 	public PluginAnalysisService(
 			AnalysisPluginCatalog pluginCatalog,
 			RequestVariableParser variableParser,
-			VictoriaMetricsClient victoriaMetricsClient) {
+			VictoriaMetricsClient victoriaMetricsClient,
+			K8sWorkloadService k8sWorkloadService) {
 		this.pluginCatalog = pluginCatalog;
 		this.variableParser = variableParser;
 		this.victoriaMetricsClient = victoriaMetricsClient;
+		this.k8sWorkloadService = k8sWorkloadService;
 	}
 
 	public List<PluginResult> runAll(AnalysisRequest request, TimeRange timeRange) {
-		List<TypedTarget> targets = variableParser.extractTypedTargets(request.getParameters());
 		List<AnalysisPlugin> plugins = pluginCatalog.getPlugins();
+		List<PluginResult> results = new ArrayList<>();
+
+		results.addAll(runVmPlugins(request, timeRange, plugins));
+		results.addAll(runK8sPlugins(request, timeRange, plugins));
+
+		log.info("Plugin runs finished: executed={}", results.size());
+		return List.copyOf(results);
+	}
+
+	private List<PluginResult> runVmPlugins(
+			AnalysisRequest request, TimeRange timeRange, List<AnalysisPlugin> plugins) {
+		List<TypedTarget> targets = variableParser.extractTypedTargets(request.getParameters()).stream()
+				.filter(t -> !"K8S".equalsIgnoreCase(t.type()))
+				.toList();
+		List<AnalysisPlugin> vmPlugins = plugins.stream()
+				.filter(p -> !p.isK8sWorkloadCheck())
+				.toList();
 
 		List<PlannedRun> planned = new ArrayList<>();
 		for (TypedTarget target : targets) {
-			for (AnalysisPlugin plugin : plugins) {
+			for (AnalysisPlugin plugin : vmPlugins) {
 				if (plugin.appliesTo(target.type())) {
 					planned.add(new PlannedRun(plugin, target));
 				}
@@ -56,14 +78,93 @@ public class PluginAnalysisService {
 		for (PlannedRun run : planned) {
 			results.add(runOne(run.plugin(), run.target(), timeRange));
 		}
+		return results;
+	}
 
-		log.info("Plugin runs finished: executed={}", results.size());
-		return List.copyOf(results);
+	private List<PluginResult> runK8sPlugins(
+			AnalysisRequest request, TimeRange timeRange, List<AnalysisPlugin> plugins) {
+		List<K8sNamespaceTarget> namespaces = variableParser.extractK8sNamespaces(request.getParameters());
+		List<AnalysisPlugin> k8sPlugins = plugins.stream()
+				.filter(AnalysisPlugin::isK8sWorkloadCheck)
+				.toList();
+		if (namespaces.isEmpty() || k8sPlugins.isEmpty()) {
+			if (!namespaces.isEmpty()) {
+				log.info("K8S namespaces present but no K8S plugins registered: {}", namespaces.size());
+			}
+			return List.of();
+		}
+
+		log.info("K8S namespaces: count={}, [{}]",
+				namespaces.size(),
+				namespaces.stream().map(K8sNamespaceTarget::namespace).collect(Collectors.joining(", ")));
+		log.info("K8S plugins to run: {}",
+				k8sPlugins.stream().map(AnalysisPlugin::name).collect(Collectors.joining(", ")));
+
+		List<PluginResult> results = new ArrayList<>();
+		for (K8sNamespaceTarget nsTarget : namespaces) {
+			try {
+				List<K8sWorkload> workloads = k8sWorkloadService.fetchWorkloads(nsTarget.namespace(), timeRange);
+				if (workloads.isEmpty()) {
+					for (AnalysisPlugin plugin : k8sPlugins) {
+						results.add(PluginResult.noDataK8s(
+								plugin, nsTarget.namespace(), "(no workloads)",
+								"namespace=" + nsTarget.namespace()));
+					}
+					continue;
+				}
+				for (K8sWorkload workload : workloads) {
+					for (AnalysisPlugin plugin : k8sPlugins) {
+						results.add(evaluateK8sPlugin(plugin, workload));
+					}
+				}
+			} catch (RestClientException e) {
+				log.warn("K8S fetch failed for namespace={}: {}", nsTarget.namespace(), e.getMessage());
+				for (AnalysisPlugin plugin : k8sPlugins) {
+					results.add(PluginResult.skipK8s(
+							plugin, nsTarget.namespace(), "*",
+							"Ошибка запроса к VictoriaMetrics: " + e.getMessage()));
+				}
+			} catch (RuntimeException e) {
+				log.warn("K8S analysis failed for namespace={}: {}", nsTarget.namespace(), e.getMessage());
+				for (AnalysisPlugin plugin : k8sPlugins) {
+					results.add(PluginResult.skipK8s(
+							plugin, nsTarget.namespace(), "*",
+							"Ошибка выполнения: " + e.getMessage()));
+				}
+			}
+		}
+		return results;
+	}
+
+	private PluginResult evaluateK8sPlugin(AnalysisPlugin plugin, K8sWorkload workload) {
+		double value;
+		String queryDoc = plugin.promQlTemplate()
+				.replace("$namespace", workload.namespace())
+				.replace("$deployment", workload.name());
+		switch (plugin.workloadMetric()) {
+			case K8S_CPU_MAX_PERCENT -> value = workload.maxCpuPercent();
+			case K8S_MEM_MAX_PERCENT -> value = workload.maxMemPercent();
+			default -> {
+				return PluginResult.skipK8s(plugin, workload.namespace(), workload.name(),
+						"Неизвестный WorkloadMetric: " + plugin.workloadMetric());
+			}
+		}
+		boolean fail = plugin.thresholdCondition().isViolation(value);
+		log.info("K8S check: rule='{}', ns={}, workload={} ({}), value={}, fail={}",
+				plugin.name(), workload.namespace(), workload.name(), workload.workloadType(), value, fail);
+		return PluginResult.evaluatedK8s(
+				plugin,
+				workload.namespace(),
+				workload.name(),
+				workload.workloadType(),
+				queryDoc,
+				value,
+				fail);
 	}
 
 	private void logPlannedRules(List<PlannedRun> planned) {
 		if (planned.isEmpty()) {
-			log.info("Matched rules to execute: count=0");
+			log.info("Matched VM rules to execute: count=0");
 			return;
 		}
 		String formatted = planned.stream()
@@ -71,7 +172,7 @@ public class PluginAnalysisService {
 						+ " [" + run.plugin().targetTypePrefix() + "/" + run.plugin().queryMode() + "]"
 						+ " <- " + run.target().canonicalName() + "=" + run.target().value())
 				.collect(Collectors.joining("; "));
-		log.info("Matched rules to execute: count={}, [{}]", planned.size(), formatted);
+		log.info("Matched VM rules to execute: count={}, [{}]", planned.size(), formatted);
 	}
 
 	private PluginResult runOne(AnalysisPlugin plugin, TypedTarget target, TimeRange timeRange) {
@@ -194,9 +295,6 @@ public class PluginAnalysisService {
 		return values;
 	}
 
-	/**
-	 * Flattens all series into one timeline (max value per timestamp if several series).
-	 */
 	static List<MetricPoint> collectRangeSeries(PrometheusResponse response) {
 		if (response.getData() == null || response.getData().getResult() == null) {
 			return List.of();

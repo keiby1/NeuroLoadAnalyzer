@@ -4,12 +4,13 @@ import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPlugin;
 import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPluginCatalog;
 import com.nla.NeuroLoadAnalyzer.plugin.ThresholdCondition;
 import com.nla.NeuroLoadAnalyzer.plugin.TrendLeakCondition;
+import com.nla.NeuroLoadAnalyzer.plugin.WorkloadMetric;
 
 import java.util.List;
 
 /**
  * Demo / CI catalog committed to git.
- * Applies to every request parameter with type prefix {@code VM_*} ({@code $VM} → param value).
+ * VM_* → node_exporter plugins; k8s_namespace=… → OpenShift workload plugins.
  */
 public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 
@@ -20,6 +21,16 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 			    - node_memory_MemAvailable_bytes{instance=~"$VM"}
 			  )[5m:1m]
 			)
+			""".trim();
+
+	private static final String K8S_CPU_DOC = """
+			max_over_time(rate(container_cpu_usage_seconds_total{container!="",container!="POD",namespace="$namespace"}[5m])[$range:$step])
+			/ limits (sum_then_percent by deployment)
+			""".trim();
+
+	private static final String K8S_MEM_DOC = """
+			max_over_time(container_memory_working_set_bytes{container!="",container!="POD",namespace="$namespace"}[$range:$step])
+			/ limits (sum_then_percent by deployment)
 			""".trim();
 
 	@Override
@@ -58,7 +69,17 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 						"""
 						node_tcp_connection_states{state="time_wait", instance=~"$VM"}
 						""".trim(),
-						ThresholdCondition.greaterThan(12_000))
+						ThresholdCondition.greaterThan(12_000)),
+				AnalysisPlugin.k8sThreshold(
+						"CPU usage > 80%",
+						K8S_CPU_DOC,
+						ThresholdCondition.greaterThan(80),
+						WorkloadMetric.K8S_CPU_MAX_PERCENT),
+				AnalysisPlugin.k8sThreshold(
+						"RAM usage > 80%",
+						K8S_MEM_DOC,
+						ThresholdCondition.greaterThan(80),
+						WorkloadMetric.K8S_MEM_MAX_PERCENT)
 		);
 	}
 }

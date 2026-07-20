@@ -14,6 +14,7 @@ public final class TargetTypeLabels {
 		}
 		return switch (typePrefix.trim().toUpperCase()) {
 			case "VM" -> "Виртуальные сервера";
+			case "K8S" -> "K8S";
 			default -> typePrefix.trim();
 		};
 	}

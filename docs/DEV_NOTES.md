@@ -7,10 +7,12 @@
 - Обязательны: `from`, `to` (мс, Grafana).
 - Остальное — произвольные параметры; одинаковые имена допускаются (multi-value).
 - Имена `Тип_Софт_Назначение` (пример `VM_Kafka_GW`). Префикс Grafana `var-` снимается.
+- K8S: `k8s_namespace=<имя>` (можно несколько; обрабатываются по очереди). Группы VM/K8S в отчёте — только если есть соответствующие результаты.
 
 ## Плагин
 `name` + `targetTypePrefix` + `QueryMode` (INSTANT|RANGE) + `promQlTemplate` (`$VM`)
 + `ThresholdCondition` (instant) или `TrendLeakCondition` (range).
+K8S: `AnalysisPlugin.k8sThreshold(..., WorkloadMetric.K8S_CPU_MAX_PERCENT | K8S_MEM_MAX_PERCENT)`.
 Статусы: OK / Warn / Fail / No Data / Skip.
 Агрегация: `Fail > Warn > NoData > OK`, Skip non-blocking.
 

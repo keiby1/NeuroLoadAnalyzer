@@ -2,10 +2,11 @@ package com.nla.NeuroLoadAnalyzer.plugin;
 
 /**
  * Analysis rule (plugin): applies to all request params with matching type prefix
- * (e.g. {@code targetTypePrefix=VM} → {@code VM_Kafka_GW}, {@code VM_Postgre_ASD}).
+ * (e.g. {@code targetTypePrefix=VM} → {@code VM_Kafka_GW}).
  *
  * <p>PromQL placeholders use {@code $} + type prefix, e.g. {@code $VM}.
  * INSTANT plugins use {@link AnalysisCondition}; RANGE plugins use {@link SeriesAnalysisCondition}.
+ * K8S inventory checks use {@link WorkloadMetric} against pre-fetched workloads.
  */
 public record AnalysisPlugin(
 		String name,
@@ -14,7 +15,8 @@ public record AnalysisPlugin(
 		String promQlTemplate,
 		AnalysisCondition thresholdCondition,
 		SeriesAnalysisCondition seriesCondition,
-		int stepMinutes
+		int stepMinutes,
+		WorkloadMetric workloadMetric
 ) {
 	public AnalysisPlugin {
 		if (name == null || name.isBlank()) {
@@ -29,7 +31,12 @@ public record AnalysisPlugin(
 		if (promQlTemplate == null || promQlTemplate.isBlank()) {
 			throw new IllegalArgumentException("promQlTemplate is required");
 		}
-		if (queryMode == QueryMode.INSTANT && thresholdCondition == null) {
+		if (workloadMetric == null) {
+			workloadMetric = WorkloadMetric.NONE;
+		}
+		if (queryMode == QueryMode.INSTANT
+				&& workloadMetric == WorkloadMetric.NONE
+				&& thresholdCondition == null) {
 			throw new IllegalArgumentException("thresholdCondition is required for INSTANT plugins");
 		}
 		if (queryMode == QueryMode.RANGE && seriesCondition == null) {
@@ -41,9 +48,9 @@ public record AnalysisPlugin(
 		targetTypePrefix = targetTypePrefix.trim();
 	}
 
-	/** Backward-compatible factory for threshold (instant) plugins. */
+	/** Backward-compatible factory for threshold (instant) VM plugins. */
 	public AnalysisPlugin(String name, String targetTypePrefix, String promQlTemplate, AnalysisCondition condition) {
-		this(name, targetTypePrefix, QueryMode.INSTANT, promQlTemplate, condition, null, 5);
+		this(name, targetTypePrefix, QueryMode.INSTANT, promQlTemplate, condition, null, 5, WorkloadMetric.NONE);
 	}
 
 	public static AnalysisPlugin range(
@@ -53,11 +60,25 @@ public record AnalysisPlugin(
 			SeriesAnalysisCondition seriesCondition,
 			int stepMinutes) {
 		return new AnalysisPlugin(
-				name, targetTypePrefix, QueryMode.RANGE, promQlTemplate, null, seriesCondition, stepMinutes);
+				name, targetTypePrefix, QueryMode.RANGE, promQlTemplate, null, seriesCondition, stepMinutes,
+				WorkloadMetric.NONE);
+	}
+
+	public static AnalysisPlugin k8sThreshold(
+			String name,
+			String documentedPromQl,
+			AnalysisCondition condition,
+			WorkloadMetric metric) {
+		return new AnalysisPlugin(
+				name, "K8S", QueryMode.INSTANT, documentedPromQl, condition, null, 5, metric);
 	}
 
 	public boolean appliesTo(String type) {
 		return type != null && targetTypePrefix.equalsIgnoreCase(type.trim());
+	}
+
+	public boolean isK8sWorkloadCheck() {
+		return workloadMetric != WorkloadMetric.NONE;
 	}
 
 	public String conditionDescription() {

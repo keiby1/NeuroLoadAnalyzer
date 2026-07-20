@@ -56,6 +56,84 @@ public record PluginResult(
 		return base(plugin, target, verdict.status(), boundQuery, display, verdict.reason(), verdict);
 	}
 
+	/** K8S workload check: hierarchy software=namespace, purpose=deployment. */
+	public static PluginResult evaluatedK8s(
+			AnalysisPlugin plugin,
+			String namespace,
+			String deploymentName,
+			String workloadType,
+			String boundQuery,
+			double metricValue,
+			boolean fail) {
+		PluginRunStatus status = fail ? PluginRunStatus.FAIL : PluginRunStatus.OK;
+		String message = fail ? "Превышение порога" : "Превышения не было";
+		return new PluginResult(
+				plugin.name(),
+				"K8S",
+				namespace,
+				deploymentName,
+				workloadType,
+				"",
+				status,
+				plugin.promQlTemplate(),
+				boundQuery,
+				metricValue,
+				plugin.conditionDescription(),
+				message,
+				null,
+				null,
+				null,
+				null);
+	}
+
+	public static PluginResult skipK8s(
+			AnalysisPlugin plugin,
+			String namespace,
+			String deploymentName,
+			String message) {
+		return new PluginResult(
+				plugin.name(),
+				"K8S",
+				namespace,
+				deploymentName,
+				"",
+				"",
+				PluginRunStatus.SKIP,
+				plugin.promQlTemplate(),
+				null,
+				null,
+				plugin.conditionDescription(),
+				message,
+				null,
+				null,
+				null,
+				null);
+	}
+
+	public static PluginResult noDataK8s(
+			AnalysisPlugin plugin,
+			String namespace,
+			String deploymentName,
+			String boundQuery) {
+		return new PluginResult(
+				plugin.name(),
+				"K8S",
+				namespace,
+				deploymentName,
+				"",
+				"",
+				PluginRunStatus.NO_DATA,
+				plugin.promQlTemplate(),
+				boundQuery,
+				null,
+				plugin.conditionDescription(),
+				"Нет данных по утилизации контейнеров",
+				null,
+				null,
+				null,
+				null);
+	}
+
 	private static PluginResult base(
 			AnalysisPlugin plugin,
 			TypedTarget target,
