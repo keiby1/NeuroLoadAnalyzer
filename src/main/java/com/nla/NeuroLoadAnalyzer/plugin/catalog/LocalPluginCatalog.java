@@ -46,7 +46,21 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 						"VM",
 						RAM_USED_BYTES,
 						TrendLeakCondition.defaults(),
-						5)
+						5),
+				new AnalysisPlugin(
+						"TCP established > 12000",
+						"VM",
+						"""
+						node_tcp_connection_states{state="established", instance=~"$VM"}
+						""".trim(),
+						ThresholdCondition.greaterThan(12_000)),
+				new AnalysisPlugin(
+						"TCP time_wait > 12000",
+						"VM",
+						"""
+						node_tcp_connection_states{state="time_wait", instance=~"$VM"}
+						""".trim(),
+						ThresholdCondition.greaterThan(12_000))
 		);
 	}
 }
