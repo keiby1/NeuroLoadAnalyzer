@@ -12,7 +12,13 @@ class StatusAggregatorTest {
 	@Test
 	void failBeatsEverything() {
 		assertEquals(PluginRunStatus.FAIL, StatusAggregator.aggregate(List.of(
-				PluginRunStatus.OK, PluginRunStatus.SKIP, PluginRunStatus.FAIL)));
+				PluginRunStatus.OK, PluginRunStatus.WARN, PluginRunStatus.SKIP, PluginRunStatus.FAIL)));
+	}
+
+	@Test
+	void warnBeatsOkAndNoData() {
+		assertEquals(PluginRunStatus.WARN, StatusAggregator.aggregate(List.of(
+				PluginRunStatus.OK, PluginRunStatus.WARN, PluginRunStatus.NO_DATA)));
 	}
 
 	@Test

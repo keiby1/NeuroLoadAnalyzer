@@ -9,9 +9,15 @@
 - Имена `Тип_Софт_Назначение` (пример `VM_Kafka_GW`). Префикс Grafana `var-` снимается.
 
 ## Плагин
-`name` + `targetTypePrefix` (напр. `VM`) + `promQlTemplate` (`$VM`) + `ThresholdCondition`.
-Для каждого параметра с типом `VM` × каждый VM-плагин → отдельный запрос к VM.
-Статусы: OK / Fail / No Data / Skip. Отчёт группируется по `software` (Kafka, Postgre, …).
+`name` + `targetTypePrefix` + `QueryMode` (INSTANT|RANGE) + `promQlTemplate` (`$VM`)
++ `ThresholdCondition` (instant) или `TrendLeakCondition` (range).
+Статусы: OK / Warn / Fail / No Data / Skip.
+Агрегация: `Fail > Warn > NoData > OK`, Skip non-blocking.
+
+### RAM growth / leak
+- PromQL: used bytes (`MemTotal - MemAvailable`), часто с `avg_over_time(...[5m:1m])`.
+- `query_range` + Sen’s slope / Mann–Kendall, warmup 1ч, min window 4ч.
+- Пороги (калибровать на 12ч прогонах): warn ≥0.05%/ч, fail ≥0.20%/ч, min Δ ≈75 МиБ.
 
 ## Каталог правил
 - Интерфейс `AnalysisPluginCatalog`.

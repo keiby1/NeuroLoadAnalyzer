@@ -4,9 +4,11 @@ package com.nla.NeuroLoadAnalyzer.plugin;
  * User-facing analysis statuses for the HTML report.
  */
 public enum PluginRunStatus {
-	/** Threshold not exceeded */
+	/** Threshold not exceeded / no leak */
 	OK,
-	/** Threshold exceeded (Fail) */
+	/** Soft signal: suspicion, insufficient horizon, short window */
+	WARN,
+	/** Threshold exceeded or confirmed leak */
 	FAIL,
 	/** Query succeeded but returned no datapoints */
 	NO_DATA,

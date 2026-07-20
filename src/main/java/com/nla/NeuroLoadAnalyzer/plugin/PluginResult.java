@@ -14,15 +14,19 @@ public record PluginResult(
 		String boundQuery,
 		Double metricValue,
 		String conditionDescription,
-		String message
+		String message,
+		Double slopeBytesPerHour,
+		Double slopePctPerHour,
+		Double deltaAbsBytes,
+		Double deltaPct
 ) {
 	public static PluginResult skip(AnalysisPlugin plugin, TypedTarget target, String message) {
-		return base(plugin, target, PluginRunStatus.SKIP, null, null, message);
+		return base(plugin, target, PluginRunStatus.SKIP, null, null, message, null);
 	}
 
 	public static PluginResult noData(AnalysisPlugin plugin, TypedTarget target, String boundQuery) {
 		return base(plugin, target, PluginRunStatus.NO_DATA, boundQuery, null,
-				"Запрос выполнен успешно, данных за выбранный диапазон нет");
+				"Запрос выполнен успешно, данных за выбранный диапазон нет", null);
 	}
 
 	public static PluginResult evaluated(
@@ -37,7 +41,19 @@ public record PluginResult(
 				fail ? PluginRunStatus.FAIL : PluginRunStatus.OK,
 				boundQuery,
 				value,
-				fail ? "Превышение порога" : "Превышения не было");
+				fail ? "Превышение порога" : "Превышения не было",
+				null);
+	}
+
+	public static PluginResult fromSeries(
+			AnalysisPlugin plugin,
+			TypedTarget target,
+			String boundQuery,
+			SeriesVerdict verdict) {
+		Double display = verdict.slopePctPerHour() != null
+				? verdict.slopePctPerHour()
+				: verdict.deltaPct();
+		return base(plugin, target, verdict.status(), boundQuery, display, verdict.reason(), verdict);
 	}
 
 	private static PluginResult base(
@@ -46,7 +62,8 @@ public record PluginResult(
 			PluginRunStatus status,
 			String boundQuery,
 			Double value,
-			String message) {
+			String message,
+			SeriesVerdict verdict) {
 		return new PluginResult(
 				plugin.name(),
 				target.type(),
@@ -58,7 +75,11 @@ public record PluginResult(
 				plugin.promQlTemplate(),
 				boundQuery,
 				value,
-				plugin.condition().description(),
-				message);
+				plugin.conditionDescription(),
+				message,
+				verdict == null ? null : verdict.slopeBytesPerHour(),
+				verdict == null ? null : verdict.slopePctPerHour(),
+				verdict == null ? null : verdict.deltaAbsBytes(),
+				verdict == null ? null : verdict.deltaPct());
 	}
 }

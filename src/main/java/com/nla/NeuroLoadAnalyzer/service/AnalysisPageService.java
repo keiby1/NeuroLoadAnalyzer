@@ -83,11 +83,11 @@ public class AnalysisPageService {
 
 				  .summary-cards {
 				    display: grid;
-				    grid-template-columns: repeat(4, 1fr);
+				    grid-template-columns: repeat(5, 1fr);
 				    gap: 16px;
 				    margin-bottom: 24px;
 				  }
-				  @media (max-width: 768px) {
+				  @media (max-width: 900px) {
 				    .summary-cards { grid-template-columns: repeat(2, 1fr); }
 				  }
 				  .summary-card {
@@ -109,6 +109,10 @@ public class AnalysisPageService {
 				  .summary-card.yellow {
 				    border-left-color: #FF9800;
 				    background: linear-gradient(135deg, #FFF8E1 0%, #FFF3E0 100%);
+				  }
+				  .summary-card.orange {
+				    border-left-color: #FB8C00;
+				    background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
 				  }
 				  .summary-card.gray {
 				    border-left-color: #9E9E9E;
@@ -159,6 +163,10 @@ public class AnalysisPageService {
 				    border-left-color: #FF9800;
 				    background: linear-gradient(135deg, #FFF8E1 0%, #FFF3E0 100%);
 				  }
+				  .card.orange {
+				    border-left-color: #FB8C00;
+				    background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
+				  }
 				  .card.gray {
 				    border-left-color: #9E9E9E;
 				    background: linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%);
@@ -207,6 +215,7 @@ public class AnalysisPageService {
 				  .sub-card.green { border-left-color: #4CAF50; }
 				  .sub-card.red { border-left-color: #F44336; }
 				  .sub-card.yellow { border-left-color: #FF9800; }
+				  .sub-card.orange { border-left-color: #FB8C00; }
 				  .sub-card.gray { border-left-color: #9E9E9E; }
 				  .sub-card-title {
 				    font-weight: bold;
@@ -234,6 +243,7 @@ public class AnalysisPageService {
 				  .status-indicator.green { background-color: #4CAF50; }
 				  .status-indicator.red { background-color: #F44336; }
 				  .status-indicator.yellow { background-color: #FF9800; }
+				  .status-indicator.orange { background-color: #FB8C00; }
 				  .status-indicator.gray { background-color: #9E9E9E; }
 				  .status-label {
 				    display: inline-block;
@@ -471,6 +481,7 @@ public class AnalysisPageService {
 
 	private void appendSummaryCards(StringBuilder html, java.util.List<PluginResult> results) {
 		int fail = 0;
+		int warn = 0;
 		int noData = 0;
 		int skip = 0;
 		int ok = 0;
@@ -481,6 +492,7 @@ public class AnalysisPageService {
 				}
 				switch (result.status()) {
 					case FAIL -> fail++;
+					case WARN -> warn++;
 					case NO_DATA -> noData++;
 					case SKIP -> skip++;
 					case OK -> ok++;
@@ -490,6 +502,7 @@ public class AnalysisPageService {
 
 		html.append("<div class=\"summary-cards\">");
 		appendSummaryCard(html, PluginRunStatus.FAIL, fail);
+		appendSummaryCard(html, PluginRunStatus.WARN, warn);
 		appendSummaryCard(html, PluginRunStatus.NO_DATA, noData);
 		appendSummaryCard(html, PluginRunStatus.SKIP, skip);
 		appendSummaryCard(html, PluginRunStatus.OK, ok);
@@ -565,7 +578,27 @@ public class AnalysisPageService {
 					.append(statusLabel(result.status()))
 					.append("</div>");
 			html.append("<div class=\"sub-card-value\">");
-			if (result.metricValue() != null) {
+			if (result.slopePctPerHour() != null || result.deltaAbsBytes() != null) {
+				html.append(esc(nullToEmpty(result.message())));
+				html.append("<div class=\"rule-line\">");
+				if (result.slopePctPerHour() != null) {
+					html.append("slope: ").append(formatNumber(result.slopePctPerHour())).append("%/ч");
+					if (result.slopeBytesPerHour() != null) {
+						html.append(" (").append(formatNumber(result.slopeBytesPerHour() / (1024 * 1024)))
+								.append(" МиБ/ч)");
+					}
+				}
+				if (result.deltaAbsBytes() != null) {
+					if (result.slopePctPerHour() != null) {
+						html.append(" · ");
+					}
+					html.append("Δ: ").append(formatNumber(result.deltaAbsBytes() / (1024 * 1024))).append(" МиБ");
+					if (result.deltaPct() != null) {
+						html.append(" (").append(formatNumber(result.deltaPct())).append("%)");
+					}
+				}
+				html.append("</div>");
+			} else if (result.metricValue() != null) {
 				html.append("значение: ").append(formatNumber(result.metricValue()))
 						.append(" · условие: ").append(esc(result.conditionDescription()));
 			} else {

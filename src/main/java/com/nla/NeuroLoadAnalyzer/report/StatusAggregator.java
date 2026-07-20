@@ -8,15 +8,7 @@ import java.util.Collection;
  * Aggregates child statuses for parent cards.
  *
  * <p><b>Default policy (non-blocking Skip):</b>
- * Fail &gt; NoData &gt; OK; Skip is used only when there is no decisive status
- * (no Fail / NoData / OK among children). So 99 OK + 1 Skip → OK.
- *
- * <p>Alternative policies (not active, for future switch):
- * <ul>
- *   <li>Strict worst: Fail &gt; NoData &gt; Skip &gt; OK</li>
- *   <li>Majority / threshold: parent Skip only if Skip share ≥ N%</li>
- *   <li>Dual signal: primary color by Fail/OK, secondary badge with Skip/NoData counts</li>
- * </ul>
+ * {@code Fail > Warn > NoData > OK}; Skip is used only when there is no decisive status.
  */
 public final class StatusAggregator {
 
@@ -29,6 +21,7 @@ public final class StatusAggregator {
 		}
 
 		boolean anyFail = false;
+		boolean anyWarn = false;
 		boolean anyNoData = false;
 		boolean anyOk = false;
 		boolean anySkip = false;
@@ -39,6 +32,7 @@ public final class StatusAggregator {
 			}
 			switch (status) {
 				case FAIL -> anyFail = true;
+				case WARN -> anyWarn = true;
 				case NO_DATA -> anyNoData = true;
 				case OK -> anyOk = true;
 				case SKIP -> anySkip = true;
@@ -47,6 +41,9 @@ public final class StatusAggregator {
 
 		if (anyFail) {
 			return PluginRunStatus.FAIL;
+		}
+		if (anyWarn) {
+			return PluginRunStatus.WARN;
 		}
 		if (anyNoData) {
 			return PluginRunStatus.NO_DATA;
@@ -60,13 +57,14 @@ public final class StatusAggregator {
 		return PluginRunStatus.OK;
 	}
 
-	/** CSS class from ExampleReport: green / red / yellow (+ gray for Skip). */
+	/** CSS class: green / orange / red / yellow / gray. */
 	public static String cssClass(PluginRunStatus status) {
 		if (status == null) {
 			return "green";
 		}
 		return switch (status) {
 			case OK -> "green";
+			case WARN -> "orange";
 			case FAIL -> "red";
 			case NO_DATA -> "yellow";
 			case SKIP -> "gray";
@@ -79,6 +77,7 @@ public final class StatusAggregator {
 		}
 		return switch (status) {
 			case OK -> "OK";
+			case WARN -> "Warn";
 			case FAIL -> "Fail";
 			case NO_DATA -> "No Data";
 			case SKIP -> "Skip";
