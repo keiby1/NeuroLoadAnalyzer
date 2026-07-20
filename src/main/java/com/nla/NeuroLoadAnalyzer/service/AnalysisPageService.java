@@ -257,6 +257,78 @@ public class AnalysisPageService {
 				    color: #888;
 				    word-break: break-all;
 				  }
+				  .metric-detail-card {
+				    cursor: pointer;
+				  }
+				  .metric-detail-card:hover {
+				    background: #e3f2fd;
+				    transform: translateX(5px);
+				    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+				  }
+				  .nla-modal-overlay {
+				    display: none;
+				    position: fixed;
+				    inset: 0;
+				    background: rgba(0, 0, 0, 0.45);
+				    z-index: 1000;
+				    align-items: center;
+				    justify-content: center;
+				    padding: 24px;
+				  }
+				  .nla-modal-overlay.open { display: flex; }
+				  .nla-modal {
+				    background: #fff;
+				    border-radius: 12px;
+				    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+				    max-width: 860px;
+				    width: 100%;
+				    max-height: 85vh;
+				    overflow: auto;
+				    position: relative;
+				    padding: 24px 28px 28px;
+				  }
+				  .nla-modal-close {
+				    position: absolute;
+				    top: 12px;
+				    right: 14px;
+				    border: none;
+				    background: transparent;
+				    font-size: 1.6em;
+				    line-height: 1;
+				    color: #888;
+				    cursor: pointer;
+				    padding: 4px 8px;
+				  }
+				  .nla-modal-close:hover { color: #333; }
+				  .nla-modal-body .sub-card {
+				    margin: 0;
+				    cursor: default;
+				    transform: none !important;
+				    box-shadow: none;
+				  }
+				  .nla-modal-body .sub-card:hover {
+				    background: #fafafa;
+				    transform: none;
+				    box-shadow: none;
+				  }
+				  .nla-modal-body .sub-card-title {
+				    font-size: 1.25em;
+				    padding-right: 36px;
+				  }
+				  .nla-modal-body .sub-card-value {
+				    font-size: 1em;
+				    margin-top: 8px;
+				  }
+				  .nla-modal-body .rule-line {
+				    margin-top: 14px;
+				    padding: 14px 16px;
+				  }
+				  .nla-modal-body .rule-line code {
+				    font-size: 0.95em;
+				    color: #333;
+				    white-space: pre-wrap;
+				    word-break: break-word;
+				  }
 				</style>
 				</head>
 				<body>
@@ -270,6 +342,12 @@ public class AnalysisPageService {
 				  </div>
 				  <div id="result"></div>
 				</div>
+				<div id="nla-modal-overlay" class="nla-modal-overlay" aria-hidden="true">
+				    <div class="nla-modal" role="dialog" aria-modal="true">
+				    <button type="button" class="nla-modal-close" id="nla-modal-close" aria-label="Закрыть">&times;</button>
+				    <div id="nla-modal-body" class="nla-modal-body"></div>
+				  </div>
+				</div>
 				<script>
 				function toggleNlaCard(card) {
 				  const subCards = card.querySelector(':scope > .sub-cards');
@@ -281,6 +359,25 @@ public class AnalysisPageService {
 				    subCards.classList.add('show');
 				    card.classList.add('expanded');
 				  }
+				}
+				function openNlaMetricModal(card) {
+				  const overlay = document.getElementById('nla-modal-overlay');
+				  const body = document.getElementById('nla-modal-body');
+				  if (!overlay || !body) return;
+				  const clone = card.cloneNode(true);
+				  clone.classList.remove('metric-detail-card');
+				  body.innerHTML = '';
+				  body.appendChild(clone);
+				  overlay.classList.add('open');
+				  overlay.setAttribute('aria-hidden', 'false');
+				}
+				function closeNlaMetricModal() {
+				  const overlay = document.getElementById('nla-modal-overlay');
+				  const body = document.getElementById('nla-modal-body');
+				  if (!overlay) return;
+				  overlay.classList.remove('open');
+				  overlay.setAttribute('aria-hidden', 'true');
+				  if (body) body.innerHTML = '';
 				}
 				function initNlaReportCards(root) {
 				  if (!root) return;
@@ -294,7 +391,20 @@ public class AnalysisPageService {
 				      }
 				    });
 				  });
+				  root.querySelectorAll('.metric-detail-card').forEach(card => {
+				    card.addEventListener('click', function(e) {
+				      e.stopPropagation();
+				      openNlaMetricModal(card);
+				    });
+				  });
 				}
+				document.getElementById('nla-modal-close').addEventListener('click', closeNlaMetricModal);
+				document.getElementById('nla-modal-overlay').addEventListener('click', function(e) {
+				  if (e.target === this) closeNlaMetricModal();
+				});
+				document.addEventListener('keydown', function(e) {
+				  if (e.key === 'Escape') closeNlaMetricModal();
+				});
 				(async function () {
 				  const statusEl = document.getElementById('status');
 				  const resultEl = document.getElementById('result');
@@ -448,7 +558,7 @@ public class AnalysisPageService {
 		html.append("<div class=\"sub-cards\">");
 		for (PluginResult result : value.results()) {
 			String ruleCss = StatusAggregator.cssClass(result.status());
-			html.append("<div class=\"sub-card ").append(ruleCss).append("\">");
+			html.append("<div class=\"sub-card metric-detail-card ").append(ruleCss).append("\">");
 			html.append("<div class=\"sub-card-title\">")
 					.append(indicator(result.status()))
 					.append(esc(result.pluginName()))
