@@ -2,7 +2,6 @@ HELP.md
 target/
 
 ### Local private analysis plugins (do not commit) ###
-src/main/java/com/nla/NeuroLoadAnalyzer/plugin/catalog/LocalPluginCatalog.java
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/

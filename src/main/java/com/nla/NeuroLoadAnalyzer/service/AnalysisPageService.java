@@ -23,7 +23,7 @@ public class AnalysisPageService {
 				<head>
 				<meta charset="UTF-8">
 				<meta name="viewport" content="width=device-width, initial-scale=1">
-				<title>NeuroLoadAnalyzer</title>
+				<title>NLA</title>
 				<style>
 				  * { margin: 0; padding: 0; box-sizing: border-box; }
 				  body {
@@ -33,17 +33,24 @@ public class AnalysisPageService {
 				    color: #333;
 				  }
 				  .wrap { max-width: 1200px; margin: 0 auto; }
-				  h1 {
-				    text-align: center;
-				    color: #333;
-				    margin-bottom: 12px;
-				    font-size: 2em;
+				  .page-header {
+				    display: flex;
+				    align-items: baseline;
+				    justify-content: flex-start;
+				    margin-bottom: 20px;
 				  }
-				  .subtitle {
-				    text-align: center;
+				  .brand {
+				    text-align: left;
+				    color: #333;
+				    font-size: 1.5em;
+				    font-weight: 700;
+				    letter-spacing: 0.02em;
+				  }
+				  .nla-meta {
 				    color: #666;
-				    margin-bottom: 28px;
-				    font-size: 0.95rem;
+				    font-size: .95rem;
+				    margin: 0 0 1.25rem;
+				    text-align: left;
 				  }
 				  #status {
 				    display: flex;
@@ -74,7 +81,6 @@ public class AnalysisPageService {
 				    padding: 0.9rem 1rem;
 				  }
 
-				  .nla-meta { color: #666; font-size: .9rem; margin: 0 0 1.25rem; text-align: center; }
 				  .summary-cards {
 				    display: grid;
 				    grid-template-columns: repeat(4, 1fr);
@@ -255,8 +261,9 @@ public class AnalysisPageService {
 				</head>
 				<body>
 				<div class="wrap">
-				  <h1>NeuroLoadAnalyzer</h1>
-				  <p class="subtitle">Анализ метрик</p>
+				  <div class="page-header">
+				    <div class="brand">NLA</div>
+				  </div>
 				  <div id="status" aria-live="polite">
 				    <div class="spinner" aria-hidden="true"></div>
 				    <div class="status-text">Выполняется анализ…</div>
@@ -316,14 +323,8 @@ public class AnalysisPageService {
 
 	public String renderReport(AnalysisReport report) {
 		StringBuilder html = new StringBuilder();
-		html.append("<p class=\"nla-meta\">Каталог: ")
-				.append(esc(report.catalogSource()))
-				.append(" · целей: ")
-				.append(report.typedTargets().size())
-				.append(" · проверок: ")
-				.append(report.pluginResults().size())
-				.append(" · range=")
-				.append(esc(report.timeRange().rangeForPromQl()))
+		html.append("<p class=\"nla-meta\">")
+				.append(esc(formatTimeWindow(report.timeRange())))
 				.append("</p>");
 
 		appendSummaryCards(html, report.pluginResults());
@@ -468,6 +469,24 @@ public class AnalysisPageService {
 			html.append("</div></div>");
 		}
 		html.append("</div></div>");
+	}
+
+	private static String formatTimeWindow(com.nla.NeuroLoadAnalyzer.util.TimeRange timeRange) {
+		if (timeRange == null) {
+			return "Период: —";
+		}
+		String from = formatGrafanaTimestamp(timeRange.fromMs());
+		String to = formatGrafanaTimestamp(timeRange.toMs());
+		return "Период: " + from + " — " + to;
+	}
+
+	private static String formatGrafanaTimestamp(Long epochMs) {
+		if (epochMs == null) {
+			return "—";
+		}
+		return java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+				.withZone(java.time.ZoneId.systemDefault())
+				.format(java.time.Instant.ofEpochMilli(epochMs));
 	}
 
 	private static String indicator(PluginRunStatus status) {
