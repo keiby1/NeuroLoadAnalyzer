@@ -270,6 +270,9 @@ public class AnalysisPageService {
 				  .metric-detail-card {
 				    cursor: pointer;
 				  }
+				  .metric-detail-card > .sub-card-value {
+				    display: none;
+				  }
 				  .metric-detail-card:hover {
 				    background: #e3f2fd;
 				    transform: translateX(5px);
