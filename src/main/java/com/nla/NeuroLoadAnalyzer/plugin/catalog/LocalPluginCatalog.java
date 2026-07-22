@@ -2,6 +2,7 @@ package com.nla.NeuroLoadAnalyzer.plugin.catalog;
 
 import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPlugin;
 import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPluginCatalog;
+import com.nla.NeuroLoadAnalyzer.plugin.NonIncreasingTrendCondition;
 import com.nla.NeuroLoadAnalyzer.plugin.ThresholdCondition;
 import com.nla.NeuroLoadAnalyzer.plugin.TrendLeakCondition;
 import com.nla.NeuroLoadAnalyzer.plugin.WorkloadMetric;
@@ -48,6 +49,14 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 			    * 100
 			  )[$range:1m]
 			)
+			""".trim();
+
+	private static final String K8S_THROTTLING_TREND_DOC = """
+			query_range: (
+			  rate(container_cpu_cfs_throttled_periods_total{container!="",container!="POD",namespace="$namespace"}[5m])
+			  / rate(container_cpu_cfs_periods_total{container!="",container!="POD",namespace="$namespace"}[5m])
+			  * 100
+			)  → max by deployment → Sen/MK trend (not increasing)
 			""".trim();
 
 	@Override
@@ -106,7 +115,13 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 						"CPU throttling > 1%",
 						K8S_THROTTLING_DOC,
 						ThresholdCondition.greaterThan(1),
-						WorkloadMetric.K8S_THROTTLING_MAX_PERCENT)
+						WorkloadMetric.K8S_THROTTLING_MAX_PERCENT),
+				AnalysisPlugin.k8sSeries(
+						"Throttling trend ↓",
+						K8S_THROTTLING_TREND_DOC,
+						NonIncreasingTrendCondition.defaults(),
+						WorkloadMetric.K8S_THROTTLING_TREND,
+						5)
 		);
 	}
 }

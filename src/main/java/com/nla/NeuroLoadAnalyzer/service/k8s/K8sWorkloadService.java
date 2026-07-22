@@ -5,6 +5,7 @@ import com.nla.NeuroLoadAnalyzer.config.VictoriaMetricsProperties;
 import com.nla.NeuroLoadAnalyzer.dto.PrometheusResponse;
 import com.nla.NeuroLoadAnalyzer.dto.k8s.K8sContainer;
 import com.nla.NeuroLoadAnalyzer.dto.k8s.K8sWorkload;
+import com.nla.NeuroLoadAnalyzer.plugin.MetricPoint;
 import com.nla.NeuroLoadAnalyzer.util.TimeRange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +19,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -128,6 +130,102 @@ public class K8sWorkloadService {
 		result.sort(Comparator.comparing(K8sWorkload::workloadType).thenComparing(K8sWorkload::name));
 		log.info("K8S namespace='{}': workloads={}", namespace, result.size());
 		return List.copyOf(result);
+	}
+
+	/**
+	 * Throttling % time series per workload (max across containers at each timestamp).
+	 * Key: {@link #workloadSeriesKey(String, String)}.
+	 */
+	public Map<String, List<MetricPoint>> fetchThrottlingTrendSeries(
+			String namespace, TimeRange timeRange, int stepMinutes) {
+		if (timeRange == null || timeRange.fromMs() == null || timeRange.toMs() == null
+				|| !timeRange.hasExplicitWindow()) {
+			log.info("K8S throttling trend skipped for namespace='{}': need from/to", namespace);
+			return Map.of();
+		}
+		long startSec = timeRange.fromMs() / 1000L;
+		long endSec = timeRange.toMs() / 1000L;
+		long stepSec = Math.max(60L, stepMinutes * 60L);
+		Long evaluationTimeSec = timeRange.evaluationTimeSec();
+
+		Map<String, String> podToDeployment = queryPodToDeployment(namespace, evaluationTimeSec);
+		Map<String, String> podToStatefulSet = queryPodToStatefulSet(namespace, evaluationTimeSec);
+
+		String cpuWindow = properties.getCpuRateWindow();
+		String throttled = addNamespaceFilter(
+				"rate(container_cpu_cfs_throttled_periods_total{container!=\"\",container!=\"POD\"}[" + cpuWindow + "])",
+				namespace);
+		String periods = addNamespaceFilter(
+				"rate(container_cpu_cfs_periods_total{container!=\"\",container!=\"POD\"}[" + cpuWindow + "])",
+				namespace);
+		String query = "((" + throttled + ") / (" + periods + ")) * 100";
+
+		PrometheusResponse resp = client.queryRange(query, startSec, endSec, stepSec);
+		if (resp == null || resp.getData() == null || resp.getData().getResult() == null) {
+			return Map.of();
+		}
+
+		Map<String, TreeMap<Long, Double>> byWorkload = new HashMap<>();
+		for (PrometheusResponse.Result r : resp.getData().getResult()) {
+			ContainerKey ck = containerKeyFromMetric(r.getMetric());
+			if (ck == null) {
+				continue;
+			}
+			String podKey = ck.namespace + "/" + ck.pod;
+			String seriesKey = null;
+			String dep = podToDeployment.get(podKey);
+			if (dep != null) {
+				seriesKey = workloadSeriesKey("Deployment", dep);
+			} else {
+				String sts = podToStatefulSet.get(podKey);
+				if (sts != null) {
+					seriesKey = workloadSeriesKey("StatefulSet", sts);
+				}
+			}
+			if (seriesKey == null) {
+				continue;
+			}
+			List<List<Object>> values = r.getValues();
+			if (values == null) {
+				continue;
+			}
+			TreeMap<Long, Double> series = byWorkload.computeIfAbsent(seriesKey, k -> new TreeMap<>());
+			for (List<Object> pair : values) {
+				if (pair == null || pair.size() < 2 || pair.get(0) == null || pair.get(1) == null) {
+					continue;
+				}
+				long ts;
+				try {
+					ts = (long) Double.parseDouble(pair.get(0).toString());
+				} catch (NumberFormatException e) {
+					continue;
+				}
+				double v;
+				try {
+					v = Double.parseDouble(pair.get(1).toString());
+				} catch (NumberFormatException e) {
+					continue;
+				}
+				if (!Double.isFinite(v) || v < 0) {
+					continue;
+				}
+				series.merge(ts, Math.min(100, v), Math::max);
+			}
+		}
+
+		Map<String, List<MetricPoint>> out = new HashMap<>();
+		for (Map.Entry<String, TreeMap<Long, Double>> e : byWorkload.entrySet()) {
+			List<MetricPoint> points = e.getValue().entrySet().stream()
+					.map(p -> new MetricPoint(p.getKey(), p.getValue()))
+					.toList();
+			out.put(e.getKey(), points);
+		}
+		log.info("K8S namespace='{}': throttling trend series for {} workloads", namespace, out.size());
+		return Map.copyOf(out);
+	}
+
+	public static String workloadSeriesKey(String workloadType, String name) {
+		return workloadType + "/" + name;
 	}
 
 	private K8sWorkload buildWorkload(

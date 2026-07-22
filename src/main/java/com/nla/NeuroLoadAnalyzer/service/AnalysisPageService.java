@@ -296,23 +296,31 @@ public class AnalysisPageService {
 				    max-width: 860px;
 				    width: 100%;
 				    max-height: 85vh;
-				    overflow: auto;
+				    overflow: hidden;
 				    position: relative;
 				    padding: 24px 28px 28px;
+				    display: flex;
+				    flex-direction: column;
 				  }
 				  .nla-modal-close {
 				    position: absolute;
 				    top: 12px;
 				    right: 14px;
+				    z-index: 2;
 				    border: none;
-				    background: transparent;
+				    background: #fff;
 				    font-size: 1.6em;
 				    line-height: 1;
 				    color: #888;
 				    cursor: pointer;
 				    padding: 4px 8px;
+				    border-radius: 6px;
 				  }
 				  .nla-modal-close:hover { color: #333; }
+				  .nla-modal-body {
+				    overflow: auto;
+				    min-height: 0;
+				  }
 				  .nla-modal-body .sub-card {
 				    margin: 0;
 				    cursor: default;

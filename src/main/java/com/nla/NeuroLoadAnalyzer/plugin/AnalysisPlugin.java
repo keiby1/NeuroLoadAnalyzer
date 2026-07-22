@@ -73,6 +73,17 @@ public record AnalysisPlugin(
 				name, "K8S", QueryMode.INSTANT, documentedPromQl, condition, null, 5, metric);
 	}
 
+	/** K8S RANGE check against a pre-fetched workload series ({@link WorkloadMetric}). */
+	public static AnalysisPlugin k8sSeries(
+			String name,
+			String documentedPromQl,
+			SeriesAnalysisCondition seriesCondition,
+			WorkloadMetric metric,
+			int stepMinutes) {
+		return new AnalysisPlugin(
+				name, "K8S", QueryMode.RANGE, documentedPromQl, null, seriesCondition, stepMinutes, metric);
+	}
+
 	public boolean appliesTo(String type) {
 		return type != null && targetTypePrefix.equalsIgnoreCase(type.trim());
 	}

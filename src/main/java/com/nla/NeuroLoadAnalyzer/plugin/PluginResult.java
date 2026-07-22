@@ -134,6 +134,35 @@ public record PluginResult(
 				null);
 	}
 
+	public static PluginResult fromSeriesK8s(
+			AnalysisPlugin plugin,
+			String namespace,
+			String deploymentName,
+			String workloadType,
+			String boundQuery,
+			SeriesVerdict verdict) {
+		Double display = verdict.slopePctPerHour() != null
+				? verdict.slopePctPerHour()
+				: verdict.deltaPct();
+		return new PluginResult(
+				plugin.name(),
+				"K8S",
+				namespace,
+				deploymentName,
+				workloadType,
+				"",
+				verdict.status(),
+				plugin.promQlTemplate(),
+				boundQuery,
+				display,
+				plugin.conditionDescription(),
+				verdict.reason(),
+				verdict.slopeBytesPerHour(),
+				verdict.slopePctPerHour(),
+				verdict.deltaAbsBytes(),
+				verdict.deltaPct());
+	}
+
 	private static PluginResult base(
 			AnalysisPlugin plugin,
 			TypedTarget target,

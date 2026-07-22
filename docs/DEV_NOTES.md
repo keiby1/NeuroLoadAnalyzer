@@ -12,7 +12,8 @@
 ## Плагин
 `name` + `targetTypePrefix` + `QueryMode` (INSTANT|RANGE) + `promQlTemplate` (`$VM`)
 + `ThresholdCondition` (instant) или `TrendLeakCondition` (range).
-K8S: `AnalysisPlugin.k8sThreshold(..., WorkloadMetric.K8S_CPU_MAX_PERCENT | K8S_MEM_MAX_PERCENT | K8S_RESTART_INCREASE | K8S_THROTTLING_MAX_PERCENT)`.
+K8S: `AnalysisPlugin.k8sThreshold(...)` / `k8sSeries(...)` + `WorkloadMetric`
+(CPU/RAM %, restarts, throttling >1%, throttling trend not increasing).
 Статусы: OK / Warn / Fail / No Data / Skip.
 Агрегация: `Fail > Warn > NoData > OK`, Skip non-blocking.
 
