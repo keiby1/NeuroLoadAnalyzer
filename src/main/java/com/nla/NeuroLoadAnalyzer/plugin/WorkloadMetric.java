@@ -7,5 +7,7 @@ package com.nla.NeuroLoadAnalyzer.plugin;
 public enum WorkloadMetric {
 	NONE,
 	K8S_CPU_MAX_PERCENT,
-	K8S_MEM_MAX_PERCENT
+	K8S_MEM_MAX_PERCENT,
+	K8S_RESTART_INCREASE,
+	K8S_THROTTLING_MAX_PERCENT
 }

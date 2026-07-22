@@ -8,6 +8,8 @@ public record K8sContainer(
 		int cpuMaxPercent,
 		int memMaxPercent,
 		int cpuAvgPercent,
-		int memAvgPercent
+		int memAvgPercent,
+		int throttlingPercent,
+		double restartIncrease
 ) {
 }

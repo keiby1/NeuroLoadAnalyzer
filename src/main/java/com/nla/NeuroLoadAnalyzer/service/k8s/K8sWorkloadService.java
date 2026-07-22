@@ -62,11 +62,13 @@ public class K8sWorkloadService {
 
 		Map<ContainerKey, ResourceValues> resources = queryContainerResources(namespace, evaluationTimeSec);
 		Map<ContainerKey, UsageValues> usage = queryContainerUsage(range, namespace, evaluationTimeSec);
+		Map<ContainerKey, Double> throttlingPercent = queryThrottlingPercent(range, namespace, evaluationTimeSec);
+		Map<ContainerKey, Double> restartIncrease = queryRestartIncrease(range, namespace, evaluationTimeSec);
 
 		List<K8sWorkload> result = new ArrayList<>();
 
 		Map<DeploymentKey, List<ContainerKey>> deploymentToContainers = new HashMap<>();
-		for (ContainerKey ck : resources.keySet()) {
+		for (ContainerKey ck : unionKeys(resources.keySet(), usage.keySet(), throttlingPercent.keySet(), restartIncrease.keySet())) {
 			String dep = podToDeployment.get(ck.namespace + "/" + ck.pod);
 			if (dep == null) {
 				continue;
@@ -86,14 +88,16 @@ public class K8sWorkloadService {
 			if (podCount == 0) {
 				continue;
 			}
-			K8sWorkload workload = buildWorkload(dk.namespace, dk.name, "Deployment", podCount, e.getValue(), resources, usage);
+			K8sWorkload workload = buildWorkload(
+					dk.namespace, dk.name, "Deployment", podCount, e.getValue(),
+					resources, usage, throttlingPercent, restartIncrease);
 			if (workload != null) {
 				result.add(workload);
 			}
 		}
 
 		Map<DeploymentKey, List<ContainerKey>> stsToContainers = new HashMap<>();
-		for (ContainerKey ck : resources.keySet()) {
+		for (ContainerKey ck : unionKeys(resources.keySet(), usage.keySet(), throttlingPercent.keySet(), restartIncrease.keySet())) {
 			String sts = podToStatefulSet.get(ck.namespace + "/" + ck.pod);
 			if (sts == null) {
 				continue;
@@ -113,7 +117,9 @@ public class K8sWorkloadService {
 			if (podCount == 0) {
 				continue;
 			}
-			K8sWorkload workload = buildWorkload(dk.namespace, dk.name, "StatefulSet", podCount, e.getValue(), resources, usage);
+			K8sWorkload workload = buildWorkload(
+					dk.namespace, dk.name, "StatefulSet", podCount, e.getValue(),
+					resources, usage, throttlingPercent, restartIncrease);
 			if (workload != null) {
 				result.add(workload);
 			}
@@ -131,12 +137,14 @@ public class K8sWorkloadService {
 			int podCount,
 			List<ContainerKey> containerKeys,
 			Map<ContainerKey, ResourceValues> resources,
-			Map<ContainerKey, UsageValues> usage) {
+			Map<ContainerKey, UsageValues> usage,
+			Map<ContainerKey, Double> throttlingPercent,
+			Map<ContainerKey, Double> restartIncrease) {
 		Map<String, List<ContainerKey>> byContainer = containerKeys.stream()
 				.collect(Collectors.groupingBy(ck -> ck.container));
 		List<K8sContainer> containers = new LinkedList<>();
 		for (Map.Entry<String, List<ContainerKey>> ce : byContainer.entrySet()) {
-			containers.add(buildContainer(ce.getKey(), ce.getValue(), resources, usage));
+			containers.add(buildContainer(ce.getKey(), ce.getValue(), resources, usage, throttlingPercent, restartIncrease));
 		}
 		if (containers.isEmpty()) {
 			return null;
@@ -148,7 +156,9 @@ public class K8sWorkloadService {
 			String containerName,
 			List<ContainerKey> keys,
 			Map<ContainerKey, ResourceValues> resources,
-			Map<ContainerKey, UsageValues> usage) {
+			Map<ContainerKey, UsageValues> usage,
+			Map<ContainerKey, Double> throttlingPercent,
+			Map<ContainerKey, Double> restartIncrease) {
 		boolean sumThenPercent = "sum_then_percent".equalsIgnoreCase(properties.getAggregationMethod());
 		int cpuAvgPercent;
 		int cpuMaxPercent;
@@ -212,7 +222,39 @@ public class K8sWorkloadService {
 			memMaxPercent = (int) Math.round(memMaxMax);
 		}
 
-		return new K8sContainer(containerName, cpuMaxPercent, memMaxPercent, cpuAvgPercent, memAvgPercent);
+		double throttlingMax = 0;
+		for (ContainerKey ck : keys) {
+			Double pct = throttlingPercent.get(ck);
+			if (pct != null && !Double.isNaN(pct)) {
+				throttlingMax = Math.max(throttlingMax, pct);
+			}
+		}
+
+		double restarts = 0;
+		for (ContainerKey ck : keys) {
+			Double inc = restartIncrease.get(ck);
+			if (inc != null && !Double.isNaN(inc) && inc > 0) {
+				restarts += inc;
+			}
+		}
+
+		return new K8sContainer(
+				containerName,
+				cpuMaxPercent,
+				memMaxPercent,
+				cpuAvgPercent,
+				memAvgPercent,
+				(int) Math.round(throttlingMax),
+				restarts);
+	}
+
+	@SafeVarargs
+	private static Set<ContainerKey> unionKeys(Set<ContainerKey>... sets) {
+		Set<ContainerKey> out = new HashSet<>();
+		for (Set<ContainerKey> set : sets) {
+			out.addAll(set);
+		}
+		return out;
 	}
 
 	private static String addNamespaceFilter(String query, String namespace) {
@@ -384,6 +426,65 @@ public class K8sWorkloadService {
 				(uv, v) -> uv.memAvgBytes = v, evaluationTimeSec);
 		fillUsageMetric(out, "max_over_time(" + mem + "[" + range + ":" + step + "])",
 				(uv, v) -> uv.memMaxBytes = v, evaluationTimeSec);
+		return out;
+	}
+
+	/**
+	 * CPU CFS throttling %: {@code 100 * rate(throttled) / rate(periods)}, avg over [$range:$step].
+	 */
+	private Map<ContainerKey, Double> queryThrottlingPercent(String range, String namespace, Long evaluationTimeSec) {
+		Map<ContainerKey, Double> out = new HashMap<>();
+		String step = properties.getSubqueryStep();
+		String cpuWindow = properties.getCpuRateWindow();
+		String throttled = addNamespaceFilter(
+				"rate(container_cpu_cfs_throttled_periods_total{container!=\"\",container!=\"POD\"}[" + cpuWindow + "])",
+				namespace);
+		String periods = addNamespaceFilter(
+				"rate(container_cpu_cfs_periods_total{container!=\"\",container!=\"POD\"}[" + cpuWindow + "])",
+				namespace);
+		String ratio = "(" + throttled + " / " + periods + ") * 100";
+		String query = "avg_over_time(" + ratio + "[" + range + ":" + step + "])";
+		PrometheusResponse resp = client.query(query, evaluationTimeSec);
+		if (resp == null || resp.getData() == null || resp.getData().getResult() == null) {
+			return out;
+		}
+		for (PrometheusResponse.Result r : resp.getData().getResult()) {
+			ContainerKey ck = containerKeyFromMetric(r.getMetric());
+			if (ck == null) {
+				continue;
+			}
+			double v = VictoriaMetricsClient.parseValue(r.getValue());
+			if (Double.isNaN(v) || v < 0) {
+				continue;
+			}
+			out.put(ck, Math.min(100, v));
+		}
+		return out;
+	}
+
+	/**
+	 * Container restart count over the analysis window: {@code increase(restarts_total[$range])}.
+	 */
+	private Map<ContainerKey, Double> queryRestartIncrease(String range, String namespace, Long evaluationTimeSec) {
+		Map<ContainerKey, Double> out = new HashMap<>();
+		String query = addNamespaceFilter(
+				"increase(kube_pod_container_status_restarts_total{container!=\"\",container!=\"POD\"}[" + range + "])",
+				namespace);
+		PrometheusResponse resp = client.query(query, evaluationTimeSec);
+		if (resp == null || resp.getData() == null || resp.getData().getResult() == null) {
+			return out;
+		}
+		for (PrometheusResponse.Result r : resp.getData().getResult()) {
+			ContainerKey ck = containerKeyFromMetric(r.getMetric());
+			if (ck == null) {
+				continue;
+			}
+			double v = VictoriaMetricsClient.parseValue(r.getValue());
+			if (Double.isNaN(v) || v < 0) {
+				continue;
+			}
+			out.merge(ck, v, Double::sum);
+		}
 		return out;
 	}
 

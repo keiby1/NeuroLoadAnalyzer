@@ -114,7 +114,7 @@ public class PluginAnalysisService {
 				}
 				for (K8sWorkload workload : workloads) {
 					for (AnalysisPlugin plugin : k8sPlugins) {
-						results.add(evaluateK8sPlugin(plugin, workload));
+						results.add(evaluateK8sPlugin(plugin, workload, timeRange));
 					}
 				}
 			} catch (RestClientException e) {
@@ -136,14 +136,17 @@ public class PluginAnalysisService {
 		return results;
 	}
 
-	private PluginResult evaluateK8sPlugin(AnalysisPlugin plugin, K8sWorkload workload) {
+	private PluginResult evaluateK8sPlugin(AnalysisPlugin plugin, K8sWorkload workload, TimeRange timeRange) {
 		double value;
 		String queryDoc = plugin.promQlTemplate()
 				.replace("$namespace", workload.namespace())
-				.replace("$deployment", workload.name());
+				.replace("$deployment", workload.name())
+				.replace("$range", timeRange.rangeForPromQl());
 		switch (plugin.workloadMetric()) {
 			case K8S_CPU_MAX_PERCENT -> value = workload.maxCpuPercent();
 			case K8S_MEM_MAX_PERCENT -> value = workload.maxMemPercent();
+			case K8S_RESTART_INCREASE -> value = workload.totalRestartIncrease();
+			case K8S_THROTTLING_MAX_PERCENT -> value = workload.maxThrottlingPercent();
 			default -> {
 				return PluginResult.skipK8s(plugin, workload.namespace(), workload.name(),
 						"Неизвестный WorkloadMetric: " + plugin.workloadMetric());

@@ -19,4 +19,13 @@ public record K8sWorkload(
 	public int maxMemPercent() {
 		return containers.stream().mapToInt(K8sContainer::memMaxPercent).max().orElse(0);
 	}
+
+	public int maxThrottlingPercent() {
+		return containers.stream().mapToInt(K8sContainer::throttlingPercent).max().orElse(0);
+	}
+
+	/** Sum of {@code increase(restarts_total[$range])} across containers in this workload. */
+	public double totalRestartIncrease() {
+		return containers.stream().mapToDouble(K8sContainer::restartIncrease).sum();
+	}
 }

@@ -33,6 +33,20 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 			/ limits (sum_then_percent by deployment)
 			""".trim();
 
+	private static final String K8S_RESTART_DOC = """
+			increase(kube_pod_container_status_restarts_total{container!="",container!="POD",namespace="$namespace"}[$range])
+			""".trim();
+
+	private static final String K8S_THROTTLING_DOC = """
+			avg_over_time(
+			  (
+			    rate(container_cpu_cfs_throttled_periods_total{container!="",container!="POD",namespace="$namespace"}[5m])
+			    / rate(container_cpu_cfs_periods_total{container!="",container!="POD",namespace="$namespace"}[5m])
+			    * 100
+			  )[$range:1m]
+			)
+			""".trim();
+
 	@Override
 	public List<AnalysisPlugin> getPlugins() {
 		return List.of(
@@ -79,7 +93,17 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 						"RAM usage > 80%",
 						K8S_MEM_DOC,
 						ThresholdCondition.greaterThan(80),
-						WorkloadMetric.K8S_MEM_MAX_PERCENT)
+						WorkloadMetric.K8S_MEM_MAX_PERCENT),
+				AnalysisPlugin.k8sThreshold(
+						"Container restarts > 0",
+						K8S_RESTART_DOC,
+						ThresholdCondition.greaterThan(0),
+						WorkloadMetric.K8S_RESTART_INCREASE),
+				AnalysisPlugin.k8sThreshold(
+						"CPU throttling > 1%",
+						K8S_THROTTLING_DOC,
+						ThresholdCondition.greaterThan(1),
+						WorkloadMetric.K8S_THROTTLING_MAX_PERCENT)
 		);
 	}
 }
