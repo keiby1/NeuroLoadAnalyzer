@@ -83,20 +83,24 @@ public class AnalysisPageService {
 
 				  .summary-cards {
 				    display: grid;
-				    grid-template-columns: repeat(5, 1fr);
-				    gap: 16px;
+				    grid-template-columns: repeat(6, minmax(0, 1fr));
+				    gap: 10px;
 				    margin-bottom: 24px;
 				  }
-				  @media (max-width: 900px) {
-				    .summary-cards { grid-template-columns: repeat(2, 1fr); }
+				  @media (max-width: 1100px) {
+				    .summary-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+				  }
+				  @media (max-width: 600px) {
+				    .summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 				  }
 				  .summary-card {
 				    background: white;
-				    border-radius: 12px;
-				    padding: 18px 16px;
-				    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-				    border-left: 5px solid;
+				    border-radius: 10px;
+				    padding: 12px 10px;
+				    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+				    border-left: 4px solid;
 				    text-align: center;
+				    min-width: 0;
 				  }
 				  .summary-card.green {
 				    border-left-color: #4CAF50;
@@ -123,13 +127,16 @@ public class AnalysisPageService {
 				    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
 				  }
 				  .summary-card-title {
-				    font-size: 0.95em;
+				    font-size: 0.8em;
 				    font-weight: 600;
 				    color: #555;
-				    margin-bottom: 8px;
+				    margin-bottom: 4px;
+				    white-space: nowrap;
+				    overflow: hidden;
+				    text-overflow: ellipsis;
 				  }
 				  .summary-card-count {
-				    font-size: 2em;
+				    font-size: 1.55em;
 				    font-weight: 700;
 				    color: #333;
 				    line-height: 1.1;
