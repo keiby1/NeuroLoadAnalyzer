@@ -6,6 +6,7 @@ import com.nla.NeuroLoadAnalyzer.dto.AnalysisRequest;
 import com.nla.NeuroLoadAnalyzer.dto.K8sNamespaceTarget;
 import com.nla.NeuroLoadAnalyzer.dto.PrometheusResponse;
 import com.nla.NeuroLoadAnalyzer.dto.TypedTarget;
+import com.nla.NeuroLoadAnalyzer.dto.k8s.K8sContainer;
 import com.nla.NeuroLoadAnalyzer.dto.k8s.K8sWorkload;
 import com.nla.NeuroLoadAnalyzer.service.RequestVariableParser;
 import com.nla.NeuroLoadAnalyzer.service.k8s.K8sWorkloadService;
@@ -18,6 +19,7 @@ import org.springframework.web.client.RestClientException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -219,7 +221,64 @@ public class PluginAnalysisService {
 				queryDoc,
 				value,
 				verdict.status(),
-				verdict.reason());
+				verdict.reason(),
+				formatContainerBreakdown(workload, plugin.workloadMetric()));
+	}
+
+	/**
+	 * Per-container lines for the report modal; {@code null} if metric has no container breakdown.
+	 */
+	static String formatContainerBreakdown(K8sWorkload workload, WorkloadMetric metric) {
+		if (workload == null || workload.containers() == null || workload.containers().isEmpty()) {
+			return null;
+		}
+		Comparator<K8sContainer> byMetricDescThenName = switch (metric) {
+			case K8S_CPU_MAX_PERCENT -> Comparator
+					.comparingInt(K8sContainer::cpuMaxPercent).reversed()
+					.thenComparing(K8sContainer::name, Comparator.nullsLast(String::compareTo));
+			case K8S_MEM_MAX_PERCENT -> Comparator
+					.comparingInt(K8sContainer::memMaxPercent).reversed()
+					.thenComparing(K8sContainer::name, Comparator.nullsLast(String::compareTo));
+			case K8S_THROTTLING_MAX_PERCENT -> Comparator
+					.comparingInt(K8sContainer::throttlingPercent).reversed()
+					.thenComparing(K8sContainer::name, Comparator.nullsLast(String::compareTo));
+			case K8S_RESTART_INCREASE -> Comparator
+					.comparingDouble(K8sContainer::restartIncrease).reversed()
+					.thenComparing(K8sContainer::name, Comparator.nullsLast(String::compareTo));
+			default -> null;
+		};
+		if (byMetricDescThenName == null) {
+			return null;
+		}
+		List<K8sContainer> sorted = workload.containers().stream()
+				.sorted(byMetricDescThenName)
+				.toList();
+		StringBuilder sb = new StringBuilder();
+		for (K8sContainer c : sorted) {
+			String name = c.name() == null || c.name().isBlank() ? "?" : c.name();
+			String line = switch (metric) {
+				case K8S_CPU_MAX_PERCENT -> name + ": max " + c.cpuMaxPercent() + "% · avg " + c.cpuAvgPercent() + "%";
+				case K8S_MEM_MAX_PERCENT -> name + ": max " + c.memMaxPercent() + "% · avg " + c.memAvgPercent() + "%";
+				case K8S_THROTTLING_MAX_PERCENT -> name + ": " + c.throttlingPercent() + "%";
+				case K8S_RESTART_INCREASE -> name + ": +" + formatRestartIncrease(c.restartIncrease());
+				default -> null;
+			};
+			if (line == null) {
+				continue;
+			}
+			if (!sb.isEmpty()) {
+				sb.append('\n');
+			}
+			sb.append(line);
+		}
+		return sb.isEmpty() ? null : sb.toString();
+	}
+
+	private static String formatRestartIncrease(double restarts) {
+		if (restarts == (long) restarts) {
+			return Long.toString((long) restarts);
+		}
+		return String.format(Locale.ROOT, "%.2f", restarts);
 	}
 
 	private void logPlannedRules(List<PlannedRun> planned) {

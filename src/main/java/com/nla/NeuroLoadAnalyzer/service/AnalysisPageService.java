@@ -297,6 +297,14 @@ public class AnalysisPageService {
 				    color: #888;
 				    word-break: break-all;
 				  }
+				  .nla-container-breakdown {
+				    white-space: normal;
+				    line-height: 1.45;
+				  }
+				  .nla-modal-body .nla-container-breakdown {
+				    font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
+				    font-size: 0.92em;
+				  }
 				  .metric-detail-card {
 				    cursor: pointer;
 				  }
@@ -737,12 +745,28 @@ public class AnalysisPageService {
 		} else {
 			html.append(esc(nullToEmpty(result.message())));
 		}
+		appendContainerBreakdown(html, result.detailBreakdown());
 		if (result.boundQuery() != null && !result.boundQuery().isBlank()) {
 			html.append("<div class=\"rule-line\"><code>")
 					.append(esc(result.boundQuery()))
 					.append("</code></div>");
 		}
 		html.append("</div></div>");
+	}
+
+	private static void appendContainerBreakdown(StringBuilder html, String detailBreakdown) {
+		if (detailBreakdown == null || detailBreakdown.isBlank()) {
+			return;
+		}
+		html.append("<div class=\"rule-line nla-container-breakdown\">по контейнерам:<br/>");
+		String[] lines = detailBreakdown.split("\n", -1);
+		for (int i = 0; i < lines.length; i++) {
+			if (i > 0) {
+				html.append("<br/>");
+			}
+			html.append(esc(lines[i]));
+		}
+		html.append("</div>");
 	}
 
 	private static boolean isK8s(String typePrefix) {

@@ -18,7 +18,8 @@ public record PluginResult(
 		Double slopeBytesPerHour,
 		Double slopePctPerHour,
 		Double deltaAbsBytes,
-		Double deltaPct
+		Double deltaPct,
+		String detailBreakdown
 ) {
 	public static PluginResult skip(AnalysisPlugin plugin, TypedTarget target, String message) {
 		return base(plugin, target, PluginRunStatus.SKIP, null, null, message, null);
@@ -82,7 +83,8 @@ public record PluginResult(
 				boundQuery,
 				metricValue,
 				fail ? PluginRunStatus.FAIL : PluginRunStatus.OK,
-				fail ? "Превышение порога" : "Превышения не было");
+				fail ? "Превышение порога" : "Превышения не было",
+				null);
 	}
 
 	public static PluginResult evaluatedK8s(
@@ -94,6 +96,28 @@ public record PluginResult(
 			double metricValue,
 			PluginRunStatus status,
 			String message) {
+		return evaluatedK8s(
+				plugin,
+				namespace,
+				deploymentName,
+				workloadType,
+				boundQuery,
+				metricValue,
+				status,
+				message,
+				null);
+	}
+
+	public static PluginResult evaluatedK8s(
+			AnalysisPlugin plugin,
+			String namespace,
+			String deploymentName,
+			String workloadType,
+			String boundQuery,
+			double metricValue,
+			PluginRunStatus status,
+			String message,
+			String detailBreakdown) {
 		return new PluginResult(
 				plugin.name(),
 				"K8S",
@@ -110,7 +134,8 @@ public record PluginResult(
 				null,
 				null,
 				null,
-				null);
+				null,
+				detailBreakdown);
 	}
 
 	public static PluginResult skipK8s(
@@ -131,6 +156,7 @@ public record PluginResult(
 				null,
 				plugin.conditionDescription(),
 				message,
+				null,
 				null,
 				null,
 				null,
@@ -155,6 +181,7 @@ public record PluginResult(
 				null,
 				plugin.conditionDescription(),
 				"Нет данных по утилизации контейнеров",
+				null,
 				null,
 				null,
 				null,
@@ -187,7 +214,8 @@ public record PluginResult(
 				verdict.slopeBytesPerHour(),
 				verdict.slopePctPerHour(),
 				verdict.deltaAbsBytes(),
-				verdict.deltaPct());
+				verdict.deltaPct(),
+				null);
 	}
 
 	private static PluginResult base(
@@ -214,6 +242,7 @@ public record PluginResult(
 				verdict == null ? null : verdict.slopeBytesPerHour(),
 				verdict == null ? null : verdict.slopePctPerHour(),
 				verdict == null ? null : verdict.deltaAbsBytes(),
-				verdict == null ? null : verdict.deltaPct());
+				verdict == null ? null : verdict.deltaPct(),
+				null);
 	}
 }
