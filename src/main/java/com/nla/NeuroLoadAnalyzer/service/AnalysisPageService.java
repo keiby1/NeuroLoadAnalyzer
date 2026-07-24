@@ -101,6 +101,19 @@ public class AnalysisPageService {
 				    border-left: 4px solid;
 				    text-align: center;
 				    min-width: 0;
+				    cursor: pointer;
+				    transition: filter 0.15s ease, box-shadow 0.15s ease;
+				    user-select: none;
+				  }
+				  .summary-card:hover {
+				    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+				  }
+				  .summary-card.filter-active {
+				    filter: brightness(0.82);
+				    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.28);
+				  }
+				  .nla-filter-hidden {
+				    display: none !important;
 				  }
 				  .summary-card.green {
 				    border-left-color: #4CAF50;
@@ -417,6 +430,61 @@ public class AnalysisPageService {
 				  overlay.setAttribute('aria-hidden', 'true');
 				  if (body) body.innerHTML = '';
 				}
+				function applyStatusFilter(root, status) {
+				  if (!root) return;
+				  root.querySelectorAll('.summary-card').forEach(c => c.classList.remove('filter-active'));
+				  root.querySelectorAll('.nla-filter-hidden').forEach(el => el.classList.remove('nla-filter-hidden'));
+				  if (!status) {
+				    return;
+				  }
+				  const active = root.querySelector('.summary-card[data-status="' + status + '"]');
+				  if (active) {
+				    active.classList.add('filter-active');
+				  }
+				  root.querySelectorAll('.metric-detail-card').forEach(leaf => {
+				    if (!leaf.classList.contains(status)) {
+				      leaf.classList.add('nla-filter-hidden');
+				      return;
+				    }
+				    let el = leaf.parentElement;
+				    while (el && el !== root) {
+				      if (el.classList && el.classList.contains('sub-cards')) {
+				        el.classList.add('show');
+				        if (el.parentElement) {
+				          el.parentElement.classList.add('expanded');
+				        }
+				      }
+				      el = el.parentElement;
+				    }
+				  });
+				  const containers = Array.from(root.querySelectorAll(
+				      '.sub-card.has-children, .card.has-children, .type-group'));
+				  containers.reverse().forEach(container => {
+				    if (!container.querySelector('.metric-detail-card:not(.nla-filter-hidden)')) {
+				      container.classList.add('nla-filter-hidden');
+				    }
+				  });
+				}
+				function initNlaStatusFilter(root) {
+				  if (!root) return;
+				  let activeFilterStatus = null;
+				  root.querySelectorAll('.summary-card').forEach(card => {
+				    const activate = function(e) {
+				      e.stopPropagation();
+				      const status = card.getAttribute('data-status');
+				      if (!status) return;
+				      activeFilterStatus = (activeFilterStatus === status) ? null : status;
+				      applyStatusFilter(root, activeFilterStatus);
+				    };
+				    card.addEventListener('click', activate);
+				    card.addEventListener('keydown', function(e) {
+				      if (e.key === 'Enter' || e.key === ' ') {
+				        e.preventDefault();
+				        activate(e);
+				      }
+				    });
+				  });
+				}
 				function initNlaReportCards(root) {
 				  if (!root) return;
 				  root.querySelectorAll('.card.has-children, .sub-card.has-children').forEach(card => {
@@ -435,6 +503,7 @@ public class AnalysisPageService {
 				      openNlaMetricModal(card);
 				    });
 				  });
+				  initNlaStatusFilter(root);
 				}
 				document.getElementById('nla-modal-close').addEventListener('click', closeNlaMetricModal);
 				document.getElementById('nla-modal-overlay').addEventListener('click', function(e) {
@@ -544,7 +613,12 @@ public class AnalysisPageService {
 	}
 
 	private static void appendSummaryCard(StringBuilder html, PluginRunStatus status, int count) {
-		html.append("<div class=\"summary-card ").append(StatusAggregator.cssClass(status)).append("\">")
+		String css = StatusAggregator.cssClass(status);
+		html.append("<div class=\"summary-card ").append(css).append("\"")
+				.append(" data-status=\"").append(css).append("\"")
+				.append(" role=\"button\" tabindex=\"0\"")
+				.append(" title=\"Клик — фильтр по статусу; повторный клик — сброс\"")
+				.append(">")
 				.append("<div class=\"summary-card-title\">")
 				.append(indicator(status))
 				.append(esc(StatusAggregator.label(status)))
