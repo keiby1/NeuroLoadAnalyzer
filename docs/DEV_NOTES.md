@@ -20,7 +20,7 @@ K8S: `k8sThreshold` / `k8sSeries` + `WorkloadMetric`.
 - Summary: `Fail | Warn | No Data | OK | Skip | Info` (синий Info).
 
 ### Полосы (`BandedThresholdCondition`)
-- CPU/RAM: ≤80 OK · (80; 90] WARN · >90 FAIL.
+- CPU/RAM: <78 OK · [78; 80) WARN · ≥80 FAIL.
 - Throttle %: ≤1 OK · (1; 10] INFO · >10 FAIL.
 - TCP: ≤12k OK · (12k; 16k) INFO · ≥16k FAIL.
 - Restarts: single `> 0` → FAIL.

@@ -73,14 +73,14 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 						"CPU max",
 						"VM",
 						VM_CPU_MAX,
-						BandedThresholdCondition.warnThenFail(80, 90)),
+						BandedThresholdCondition.warnThenFail(78, 80)),
 				new AnalysisPlugin(
 						"RAM usage",
 						"VM",
 						"""
 						max(100*(1-(node_memory_MemAvailable_bytes{instance=~"$VM"} / node_memory_MemTotal_bytes{instance=~"$VM"}))) by (instance)
 						""".trim(),
-						BandedThresholdCondition.warnThenFail(80, 90)),
+						BandedThresholdCondition.warnThenFail(78, 80)),
 				AnalysisPlugin.range(
 						"RAM growth / leak",
 						"VM",
@@ -104,12 +104,12 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 				AnalysisPlugin.k8sThreshold(
 						"CPU usage",
 						K8S_CPU_DOC,
-						BandedThresholdCondition.warnThenFail(80, 90),
+						BandedThresholdCondition.warnThenFail(78, 80),
 						WorkloadMetric.K8S_CPU_MAX_PERCENT),
 				AnalysisPlugin.k8sThreshold(
 						"RAM usage",
 						K8S_MEM_DOC,
-						BandedThresholdCondition.warnThenFail(80, 90),
+						BandedThresholdCondition.warnThenFail(78, 80),
 						WorkloadMetric.K8S_MEM_MAX_PERCENT),
 				AnalysisPlugin.k8sThreshold(
 						"Container restarts > 0",

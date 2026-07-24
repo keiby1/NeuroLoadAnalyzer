@@ -191,7 +191,7 @@ Auth **не используется** (доступ во внутренней �
 Агрегация вверх: **`FAIL > WARN > NO_DATA > OK > SKIP > INFO`**. INFO поднимается только если все потомки INFO.
 Summary: `Fail | Warn | No Data | OK | Skip | Info`.
 
-Полосы: CPU/RAM 80/90 (WARN soft); throttle 1/10 (INFO soft); TCP 12k/16k (INFO soft, hard ≥).
+Полосы: CPU/RAM <78 OK / [78; 80) WARN / ≥80 FAIL; throttle 1/10 (INFO soft); TCP 12k/16k (INFO soft, hard ≥).
 VM **CPU max** — сглаженный max за период (`rate[5m]` → `max_over_time[$range:$step]`).
 
 Отчёт группируется:

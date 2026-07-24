@@ -5,7 +5,7 @@ import java.util.Locale;
 /**
  * Two-boundary threshold: OK / soft (WARN|INFO) / FAIL.
  *
- * <p>Profile A (blocking soft): {@code ≤warn → OK}, {@code (warn; fail] → WARN}, {@code >fail → FAIL}.
+ * <p>Profile A (CPU/RAM, WARN soft): {@code <warn → OK}, {@code [warn; fail) → WARN}, {@code ≥fail → FAIL}.
  * <p>Profile B (info soft, exclusive hard): {@code ≤warn → OK}, {@code (warn; fail] → INFO}, {@code >fail → FAIL}.
  * <p>Profile B with inclusive hard (TCP): {@code ≤warn → OK}, {@code (warn; fail) → INFO}, {@code ≥fail → FAIL}.
  */
@@ -40,9 +40,9 @@ public record BandedThresholdCondition(
 		}
 	}
 
-	/** CPU/RAM: soft → WARN, hard {@code > fail}. */
+	/** CPU/RAM: {@code <warn} OK, {@code [warn; fail)} WARN, {@code ≥fail} FAIL. */
 	public static BandedThresholdCondition warnThenFail(double warnThreshold, double failThreshold) {
-		return new BandedThresholdCondition(warnThreshold, failThreshold, SoftBand.WARN, HardBound.EXCLUSIVE_GT);
+		return new BandedThresholdCondition(warnThreshold, failThreshold, SoftBand.WARN, HardBound.INCLUSIVE_GTE);
 	}
 
 	/** Throttle: soft → INFO, hard {@code > fail}. */
@@ -65,6 +65,20 @@ public record BandedThresholdCondition(
 		if (!Double.isFinite(value)) {
 			return new ThresholdVerdict(PluginRunStatus.NO_DATA, "Некорректное значение метрики");
 		}
+		if (softBand == SoftBand.WARN) {
+			// <warn OK · [warn; fail) WARN · ≥fail FAIL
+			if (value < warnThreshold) {
+				return new ThresholdVerdict(PluginRunStatus.OK,
+						String.format(Locale.ROOT, "%.3f < %.3f (OK)", value, warnThreshold));
+			}
+			if (value < failThreshold) {
+				return new ThresholdVerdict(PluginRunStatus.WARN,
+						String.format(Locale.ROOT, "%.3f (warn)", value));
+			}
+			return new ThresholdVerdict(PluginRunStatus.FAIL,
+					String.format(Locale.ROOT, "%.3f (fail)", value));
+		}
+		// INFO soft (throttle / TCP)
 		if (value <= warnThreshold) {
 			return new ThresholdVerdict(PluginRunStatus.OK,
 					String.format(Locale.ROOT, "%.3f ≤ %.3f (OK)", value, warnThreshold));
@@ -74,22 +88,23 @@ public record BandedThresholdCondition(
 			case INCLUSIVE_GTE -> value >= failThreshold;
 		};
 		if (hardFail) {
-			String tag = softBand == SoftBand.INFO ? "hard" : "fail";
 			return new ThresholdVerdict(PluginRunStatus.FAIL,
-					String.format(Locale.ROOT, "%.3f (%s)", value, tag));
+					String.format(Locale.ROOT, "%.3f (hard)", value));
 		}
-		PluginRunStatus softStatus = softBand == SoftBand.WARN ? PluginRunStatus.WARN : PluginRunStatus.INFO;
-		String tag = softBand == SoftBand.INFO ? "soft" : "warn";
-		return new ThresholdVerdict(softStatus,
-				String.format(Locale.ROOT, "%.3f (%s)", value, tag));
+		return new ThresholdVerdict(PluginRunStatus.INFO,
+				String.format(Locale.ROOT, "%.3f (soft)", value));
 	}
 
 	@Override
 	public String description() {
-		String soft = softBand == SoftBand.WARN ? "WARN" : "INFO";
+		if (softBand == SoftBand.WARN) {
+			return String.format(Locale.ROOT,
+					"<%.3f OK; [%.3f; %.3f) WARN; ≥%.3f FAIL",
+					warnThreshold, warnThreshold, failThreshold, failThreshold);
+		}
 		String hard = hardBound == HardBound.INCLUSIVE_GTE ? ">=" : ">";
 		return String.format(Locale.ROOT,
-				"≤%.3f OK; soft→%s; %s%.3f FAIL",
-				warnThreshold, soft, hard, failThreshold);
+				"≤%.3f OK; soft→INFO; %s%.3f FAIL",
+				warnThreshold, hard, failThreshold);
 	}
 }

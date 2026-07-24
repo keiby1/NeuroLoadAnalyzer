@@ -8,12 +8,12 @@ class BandedThresholdConditionTest {
 
 	@Test
 	void warnThenFailBands() {
-		BandedThresholdCondition c = BandedThresholdCondition.warnThenFail(80, 90);
-		assertEquals(PluginRunStatus.OK, c.evaluate(80).status());
-		assertEquals(PluginRunStatus.WARN, c.evaluate(85).status());
-		assertEquals(PluginRunStatus.WARN, c.evaluate(90).status());
-		assertEquals(PluginRunStatus.FAIL, c.evaluate(90.1).status());
-		assertEquals(PluginRunStatus.FAIL, c.evaluate(95).status());
+		BandedThresholdCondition c = BandedThresholdCondition.warnThenFail(78, 80);
+		assertEquals(PluginRunStatus.OK, c.evaluate(77.9).status());
+		assertEquals(PluginRunStatus.WARN, c.evaluate(78).status());
+		assertEquals(PluginRunStatus.WARN, c.evaluate(79.9).status());
+		assertEquals(PluginRunStatus.FAIL, c.evaluate(80).status());
+		assertEquals(PluginRunStatus.FAIL, c.evaluate(85).status());
 	}
 
 	@Test
