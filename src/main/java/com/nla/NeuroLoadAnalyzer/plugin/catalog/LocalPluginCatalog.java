@@ -94,14 +94,14 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 						"TCP established",
 						"VM",
 						"""
-						node_tcp_connection_states{state="established", instance=~"$VM"}
+						sum(node_tcp_connection_states{state="established", instance=~"$VM"}) or vector(0)
 						""".trim(),
 						BandedThresholdCondition.infoThenFailInclusive(12_000, 16_000)),
 				new AnalysisPlugin(
 						"TCP time_wait",
 						"VM",
 						"""
-						node_tcp_connection_states{state="time_wait", instance=~"$VM"}
+						sum(node_tcp_connection_states{state="time_wait", instance=~"$VM"}) or vector(0)
 						""".trim(),
 						BandedThresholdCondition.infoThenFailInclusive(12_000, 16_000)),
 				AnalysisPlugin.k8sThreshold(

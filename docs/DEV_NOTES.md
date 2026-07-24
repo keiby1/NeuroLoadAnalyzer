@@ -23,6 +23,7 @@ K8S: `k8sThreshold` / `k8sSeries` + `WorkloadMetric`.
 - CPU/RAM: <78 OK · [78; 80) WARN · ≥80 FAIL.
 - Throttle %: ≤1 OK · (1; 10] INFO · >10 FAIL.
 - TCP: ≤12k OK · (12k; 16k) INFO · ≥16k FAIL.
+  PromQL: `sum(...state...) or vector(0)` — отсутствие серии = 0 → OK (не No Data).
 - Restarts: single `> 0` → FAIL.
 - Throttling trend: OK / FAIL(рост) / INFO(мало данных).
 
