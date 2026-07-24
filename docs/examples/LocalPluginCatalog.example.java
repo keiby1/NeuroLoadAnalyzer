@@ -4,6 +4,7 @@ import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPlugin;
 import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPluginCatalog;
 import com.nla.NeuroLoadAnalyzer.plugin.BandedThresholdCondition;
 import com.nla.NeuroLoadAnalyzer.plugin.NonIncreasingTrendCondition;
+import com.nla.NeuroLoadAnalyzer.plugin.QuadBandThresholdCondition;
 import com.nla.NeuroLoadAnalyzer.plugin.ThresholdCondition;
 import com.nla.NeuroLoadAnalyzer.plugin.TrendLeakCondition;
 import com.nla.NeuroLoadAnalyzer.plugin.WorkloadMetric;
@@ -123,7 +124,7 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 				AnalysisPlugin.k8sThreshold(
 						"CPU throttling",
 						K8S_THROTTLING_DOC,
-						BandedThresholdCondition.infoThenFail(1, 10),
+						QuadBandThresholdCondition.infoWarnThenFail(1, 3, 7),
 						WorkloadMetric.K8S_THROTTLING_MAX_PERCENT),
 				AnalysisPlugin.k8sSeries(
 						"Throttling trend ↓",
