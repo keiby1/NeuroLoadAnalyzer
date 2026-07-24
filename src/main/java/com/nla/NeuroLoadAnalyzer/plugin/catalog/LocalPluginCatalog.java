@@ -2,6 +2,7 @@ package com.nla.NeuroLoadAnalyzer.plugin.catalog;
 
 import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPlugin;
 import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPluginCatalog;
+import com.nla.NeuroLoadAnalyzer.plugin.BandedThresholdCondition;
 import com.nla.NeuroLoadAnalyzer.plugin.NonIncreasingTrendCondition;
 import com.nla.NeuroLoadAnalyzer.plugin.ThresholdCondition;
 import com.nla.NeuroLoadAnalyzer.plugin.TrendLeakCondition;
@@ -24,6 +25,15 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 			    node_memory_MemTotal_bytes{instance=~"$VM"}
 			    - node_memory_MemAvailable_bytes{instance=~"$VM"}
 			  )[5m:1m]
+			)
+			""".trim();
+
+	/** Smoothed max CPU %% over from–to: avg window 5m, then max_over_time. */
+	private static final String VM_CPU_MAX = """
+			max_over_time(
+			  (
+			    100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle", instance=~"$VM"}[5m])) * 100)
+			  )[$range:$step]
 			)
 			""".trim();
 
@@ -63,19 +73,17 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 	public List<AnalysisPlugin> getPlugins() {
 		return List.of(
 				new AnalysisPlugin(
-						"CPU > 80%",
+						"CPU max",
 						"VM",
-						"""
-						100 - (avg(irate(node_cpu_seconds_total{mode="idle", instance=~"$VM"}[1m])) by (instance)*100)
-						""".trim(),
-						ThresholdCondition.greaterThan(80)),
+						VM_CPU_MAX,
+						BandedThresholdCondition.warnThenFail(80, 90)),
 				new AnalysisPlugin(
-						"RAM > 80%",
+						"RAM usage",
 						"VM",
 						"""
 						max(100*(1-(node_memory_MemAvailable_bytes{instance=~"$VM"} / node_memory_MemTotal_bytes{instance=~"$VM"}))) by (instance)
 						""".trim(),
-						ThresholdCondition.greaterThan(80)),
+						BandedThresholdCondition.warnThenFail(80, 90)),
 				AnalysisPlugin.range(
 						"RAM growth / leak",
 						"VM",
@@ -83,28 +91,28 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 						TrendLeakCondition.defaults(),
 						5),
 				new AnalysisPlugin(
-						"TCP established > 12000",
+						"TCP established",
 						"VM",
 						"""
 						node_tcp_connection_states{state="established", instance=~"$VM"}
 						""".trim(),
-						ThresholdCondition.greaterThan(12_000)),
+						BandedThresholdCondition.infoThenFailInclusive(12_000, 16_000)),
 				new AnalysisPlugin(
-						"TCP time_wait > 12000",
+						"TCP time_wait",
 						"VM",
 						"""
 						node_tcp_connection_states{state="time_wait", instance=~"$VM"}
 						""".trim(),
-						ThresholdCondition.greaterThan(12_000)),
+						BandedThresholdCondition.infoThenFailInclusive(12_000, 16_000)),
 				AnalysisPlugin.k8sThreshold(
-						"CPU usage > 80%",
+						"CPU usage",
 						K8S_CPU_DOC,
-						ThresholdCondition.greaterThan(80),
+						BandedThresholdCondition.warnThenFail(80, 90),
 						WorkloadMetric.K8S_CPU_MAX_PERCENT),
 				AnalysisPlugin.k8sThreshold(
-						"RAM usage > 80%",
+						"RAM usage",
 						K8S_MEM_DOC,
-						ThresholdCondition.greaterThan(80),
+						BandedThresholdCondition.warnThenFail(80, 90),
 						WorkloadMetric.K8S_MEM_MAX_PERCENT),
 				AnalysisPlugin.k8sThreshold(
 						"Container restarts > 0",
@@ -112,9 +120,9 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 						ThresholdCondition.greaterThan(0),
 						WorkloadMetric.K8S_RESTART_INCREASE),
 				AnalysisPlugin.k8sThreshold(
-						"CPU throttling > 1%",
+						"CPU throttling",
 						K8S_THROTTLING_DOC,
-						ThresholdCondition.greaterThan(1),
+						BandedThresholdCondition.infoThenFail(1, 10),
 						WorkloadMetric.K8S_THROTTLING_MAX_PERCENT),
 				AnalysisPlugin.k8sSeries(
 						"Throttling trend ↓",

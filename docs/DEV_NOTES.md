@@ -10,12 +10,28 @@
 - K8S: `k8s_namespace=<имя>` (можно несколько; обрабатываются по очереди). Группы VM/K8S в отчёте — только если есть соответствующие результаты.
 
 ## Плагин
-`name` + `targetTypePrefix` + `QueryMode` (INSTANT|RANGE) + `promQlTemplate` (`$VM`)
-+ `ThresholdCondition` (instant) или `TrendLeakCondition` (range).
-K8S: `AnalysisPlugin.k8sThreshold(...)` / `k8sSeries(...)` + `WorkloadMetric`
-(CPU/RAM %, restarts, throttling >1%, throttling trend not increasing).
-Статусы: OK / Warn / Fail / No Data / Skip.
-Агрегация: `Fail > Warn > NoData > OK`, Skip non-blocking.
+`name` + `targetTypePrefix` + `QueryMode` (INSTANT|RANGE) + `promQlTemplate` (`$VM`, `$range`, `$step`)
++ `ThresholdCondition` / `BandedThresholdCondition` (instant) или series-условие (range).
+K8S: `k8sThreshold` / `k8sSeries` + `WorkloadMetric`.
+
+### Статусы и aggregate
+Цепочка (худший → лучший): **`FAIL > WARN > NO_DATA > OK > SKIP > INFO`**.
+- INFO поднимает родителя **только** если все потомки INFO.
+- Summary: `Fail | Warn | No Data | OK | Skip | Info` (синий Info).
+
+### Полосы (`BandedThresholdCondition`)
+- CPU/RAM: ≤80 OK · (80; 90] WARN · >90 FAIL.
+- Throttle %: ≤1 OK · (1; 10] INFO · >10 FAIL.
+- TCP: ≤12k OK · (12k; 16k) INFO · ≥16k FAIL.
+- Restarts: single `> 0` → FAIL.
+- Throttling trend: OK / FAIL(рост) / INFO(мало данных).
+
+### VM CPU max
+Сглаженный max за from–to: `max_over_time((100 - avg(rate(...idle...[5m]))*100)[$range:$step])`, bands 80/90.
+Имя в отчёте: **CPU max**.
+
+### Follow-up (не реализовано)
+**CPU time above 80%** — доля времени CPU > 80%: ≤1% OK · (1%; 5%] INFO · >5% FAIL.
 
 ### RAM growth / leak
 - PromQL: used bytes (`MemTotal - MemAvailable`), часто с `avg_over_time(...[5m:1m])`.

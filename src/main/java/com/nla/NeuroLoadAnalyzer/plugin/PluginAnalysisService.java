@@ -1,6 +1,7 @@
 package com.nla.NeuroLoadAnalyzer.plugin;
 
 import com.nla.NeuroLoadAnalyzer.client.VictoriaMetricsClient;
+import com.nla.NeuroLoadAnalyzer.config.VictoriaMetricsProperties;
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisRequest;
 import com.nla.NeuroLoadAnalyzer.dto.K8sNamespaceTarget;
 import com.nla.NeuroLoadAnalyzer.dto.PrometheusResponse;
@@ -33,16 +34,19 @@ public class PluginAnalysisService {
 	private final RequestVariableParser variableParser;
 	private final VictoriaMetricsClient victoriaMetricsClient;
 	private final K8sWorkloadService k8sWorkloadService;
+	private final VictoriaMetricsProperties victoriaMetricsProperties;
 
 	public PluginAnalysisService(
 			AnalysisPluginCatalog pluginCatalog,
 			RequestVariableParser variableParser,
 			VictoriaMetricsClient victoriaMetricsClient,
-			K8sWorkloadService k8sWorkloadService) {
+			K8sWorkloadService k8sWorkloadService,
+			VictoriaMetricsProperties victoriaMetricsProperties) {
 		this.pluginCatalog = pluginCatalog;
 		this.variableParser = variableParser;
 		this.victoriaMetricsClient = victoriaMetricsClient;
 		this.k8sWorkloadService = k8sWorkloadService;
+		this.victoriaMetricsProperties = victoriaMetricsProperties;
 	}
 
 	public List<PluginResult> runAll(AnalysisRequest request, TimeRange timeRange) {
@@ -203,9 +207,10 @@ public class PluginAnalysisService {
 						"Неизвестный WorkloadMetric: " + plugin.workloadMetric());
 			}
 		}
-		boolean fail = plugin.thresholdCondition().isViolation(value);
-		log.info("K8S check: rule='{}', ns={}, workload={} ({}), value={}, fail={}",
-				plugin.name(), workload.namespace(), workload.name(), workload.workloadType(), value, fail);
+		ThresholdVerdict verdict = plugin.thresholdCondition().evaluate(value);
+		log.info("K8S check: rule='{}', ns={}, workload={} ({}), value={}, status={}",
+				plugin.name(), workload.namespace(), workload.name(), workload.workloadType(),
+				value, verdict.status());
 		return PluginResult.evaluatedK8s(
 				plugin,
 				workload.namespace(),
@@ -213,7 +218,8 @@ public class PluginAnalysisService {
 				workload.workloadType(),
 				queryDoc,
 				value,
-				fail);
+				verdict.status(),
+				verdict.reason());
 	}
 
 	private void logPlannedRules(List<PlannedRun> planned) {
@@ -232,7 +238,7 @@ public class PluginAnalysisService {
 	private PluginResult runOne(AnalysisPlugin plugin, TypedTarget target, TimeRange timeRange) {
 		PromQlBinder.BindResult bind = PromQlBinder.bind(
 				plugin.promQlTemplate(),
-				name -> resolvePlaceholder(name, plugin, target));
+				name -> resolvePlaceholder(name, plugin, target, timeRange));
 
 		if (!bind.complete()) {
 			log.warn("VM query skipped (incomplete bind): rule='{}', param={}={}, missing={}",
@@ -279,10 +285,10 @@ public class PluginAnalysisService {
 		}
 
 		double metricValue = values.stream().mapToDouble(Double::doubleValue).max().orElse(Double.NaN);
-		boolean fail = values.stream().anyMatch(plugin.thresholdCondition()::isViolation);
-		log.info("VM request status: SUCCESS (rule='{}', param={}, datapoints={}, value={}, analysisFail={})",
-				plugin.name(), target.canonicalName(), values.size(), metricValue, fail);
-		return PluginResult.evaluated(plugin, target, query, metricValue, fail);
+		ThresholdVerdict verdict = plugin.thresholdCondition().evaluate(metricValue);
+		log.info("VM request status: SUCCESS (rule='{}', param={}, datapoints={}, value={}, status={})",
+				plugin.name(), target.canonicalName(), values.size(), metricValue, verdict.status());
+		return PluginResult.evaluated(plugin, target, query, metricValue, verdict.status(), verdict.reason());
 	}
 
 	private PluginResult runRange(
@@ -317,12 +323,20 @@ public class PluginAnalysisService {
 		return PluginResult.fromSeries(plugin, target, query, verdict);
 	}
 
-	private static Optional<String> resolvePlaceholder(
+	private Optional<String> resolvePlaceholder(
 			String placeholderName,
 			AnalysisPlugin plugin,
-			TypedTarget target) {
+			TypedTarget target,
+			TimeRange timeRange) {
 		if (placeholderName == null) {
 			return Optional.empty();
+		}
+		if ("range".equalsIgnoreCase(placeholderName)) {
+			return Optional.ofNullable(timeRange.rangeForPromQl());
+		}
+		if ("step".equalsIgnoreCase(placeholderName)) {
+			String step = victoriaMetricsProperties.getSubqueryStep();
+			return Optional.of(step == null || step.isBlank() ? "1m" : step);
 		}
 		if (placeholderName.equalsIgnoreCase(plugin.targetTypePrefix())
 				|| placeholderName.equalsIgnoreCase(target.type())) {

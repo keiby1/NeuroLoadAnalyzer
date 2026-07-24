@@ -50,7 +50,7 @@ public final class NonIncreasingTrendCondition implements SeriesAnalysisConditio
 			return SeriesVerdict.of(PluginRunStatus.NO_DATA, "Нет конечных точек в ряде");
 		}
 		if (sorted.size() < minPoints) {
-			return SeriesVerdict.of(PluginRunStatus.WARN,
+			return SeriesVerdict.of(PluginRunStatus.INFO,
 					String.format(Locale.ROOT,
 							"Мало точек для анализа тренда (точек=%d, нужно ≥%d)",
 							sorted.size(), minPoints));

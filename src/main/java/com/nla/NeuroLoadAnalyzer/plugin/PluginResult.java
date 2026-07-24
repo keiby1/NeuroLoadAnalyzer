@@ -35,14 +35,23 @@ public record PluginResult(
 			String boundQuery,
 			double value,
 			boolean fail) {
-		return base(
+		return evaluated(
 				plugin,
 				target,
-				fail ? PluginRunStatus.FAIL : PluginRunStatus.OK,
 				boundQuery,
 				value,
-				fail ? "Превышение порога" : "Превышения не было",
-				null);
+				fail ? PluginRunStatus.FAIL : PluginRunStatus.OK,
+				fail ? "Превышение порога" : "Превышения не было");
+	}
+
+	public static PluginResult evaluated(
+			AnalysisPlugin plugin,
+			TypedTarget target,
+			String boundQuery,
+			double value,
+			PluginRunStatus status,
+			String message) {
+		return base(plugin, target, status, boundQuery, value, message, null);
 	}
 
 	public static PluginResult fromSeries(
@@ -65,8 +74,26 @@ public record PluginResult(
 			String boundQuery,
 			double metricValue,
 			boolean fail) {
-		PluginRunStatus status = fail ? PluginRunStatus.FAIL : PluginRunStatus.OK;
-		String message = fail ? "Превышение порога" : "Превышения не было";
+		return evaluatedK8s(
+				plugin,
+				namespace,
+				deploymentName,
+				workloadType,
+				boundQuery,
+				metricValue,
+				fail ? PluginRunStatus.FAIL : PluginRunStatus.OK,
+				fail ? "Превышение порога" : "Превышения не было");
+	}
+
+	public static PluginResult evaluatedK8s(
+			AnalysisPlugin plugin,
+			String namespace,
+			String deploymentName,
+			String workloadType,
+			String boundQuery,
+			double metricValue,
+			PluginRunStatus status,
+			String message) {
 		return new PluginResult(
 				plugin.name(),
 				"K8S",

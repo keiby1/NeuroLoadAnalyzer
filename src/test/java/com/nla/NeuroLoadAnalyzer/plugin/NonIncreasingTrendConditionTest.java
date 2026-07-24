@@ -37,10 +37,10 @@ class NonIncreasingTrendConditionTest {
 	}
 
 	@Test
-	void shortSeriesIsWarn() {
+	void shortSeriesIsInfo() {
 		List<MetricPoint> series = linear(3, 300, 1.0, 1.0);
 		SeriesVerdict verdict = condition.evaluate(series);
-		assertEquals(PluginRunStatus.WARN, verdict.status(), verdict.reason());
+		assertEquals(PluginRunStatus.INFO, verdict.status(), verdict.reason());
 	}
 
 	private static List<MetricPoint> linear(int points, int stepSec, double start, double perStep) {

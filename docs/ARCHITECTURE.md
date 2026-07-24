@@ -161,7 +161,7 @@ Auth **не используется** (доступ во внутренней �
 2. **targetTypePrefix** — тип целей, напр. `VM` → все параметры `VM_*`; для K8S — `K8S` + `WorkloadMetric`;
 3. **QueryMode** — `INSTANT` или `RANGE` (VM); K8S-проверки — порог по уже собранному inventory;
 4. **PromQL-шаблон** с плейсхолдером `$VM` (VM) или документированный запрос (K8S);
-5. **условие** — `ThresholdCondition` (instant) или `TrendLeakCondition` (range).
+5. **условие** — `ThresholdCondition` / `BandedThresholdCondition` (instant) или `TrendLeakCondition` / `NonIncreasingTrendCondition` (range/series).
 
 ### Входные параметры
 
@@ -181,17 +181,24 @@ Auth **не используется** (доступ во внутренней �
 
 | Статус | Смысл |
 |--------|--------|
-| OK | превышения/утечки нет |
-| Warn | подозрение / мало данных / late-onset / step-change |
-| Fail | превышение или подтверждённая утечка |
+| OK | норма |
+| Info | soft-полоса (throttle/TCP) или мало данных у trend |
+| Warn | серая зона blocking (CPU/RAM) / неуверенность leak |
+| Fail | hard-порог / рост тренда / confirmed leak |
 | No Data | запрос успешен, данных нет |
 | Skip | ошибка, данные получить не удалось |
 
-Агрегация: **Fail > Warn > NoData > OK**, Skip non-blocking. Leak в UI: slope / Δ / reason.
+Агрегация вверх: **`FAIL > WARN > NO_DATA > OK > SKIP > INFO`**. INFO поднимается только если все потомки INFO.
+Summary: `Fail | Warn | No Data | OK | Skip | Info`.
+
+Полосы: CPU/RAM 80/90 (WARN soft); throttle 1/10 (INFO soft); TCP 12k/16k (INFO soft, hard ≥).
+VM **CPU max** — сглаженный max за период (`rate[5m]` → `max_over_time[$range:$step]`).
 
 Отчёт группируется:
 - **VM:** Тип → Софт → Назначение → значение параметра → проверки;
 - **K8S:** K8S → namespace → deployment → проверки.
+
+(`metricGroup` в дереве — отложено.)
 
 ### Каталог (важно для git)
 
@@ -215,9 +222,9 @@ Auth **не используется** (доступ во внутренней �
 → для VM: `Софт` → `Назначение` → `значение параметра` → проверки;
 → для K8S: `namespace` → `deployment` → проверки.
 
-Агрегация статусов вверх (`StatusAggregator`, политика non-blocking Skip):
-`Fail > Warn > NoData > OK`; `Skip` учитывается только если нет решающих статусов.
-Цвета: OK=green, Warn=orange, Fail=red, NoData=yellow, Skip=gray.
+Агрегация статусов вверх (`StatusAggregator`):
+`FAIL > WARN > NO_DATA > OK > SKIP > INFO` (INFO — только если все дети INFO).
+Цвета: OK=green, Warn=orange, Fail=red, NoData=yellow, Skip=gray, Info=blue.
 
 ---
 

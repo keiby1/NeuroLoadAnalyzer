@@ -7,8 +7,8 @@ import java.util.Collection;
 /**
  * Aggregates child statuses for parent cards.
  *
- * <p><b>Default policy (non-blocking Skip):</b>
- * {@code Fail > Warn > NoData > OK}; Skip is used only when there is no decisive status.
+ * <p>Chain (worst → best): {@code FAIL > WARN > NO_DATA > OK > SKIP > INFO}.
+ * INFO becomes the parent status only when every child is INFO.
  */
 public final class StatusAggregator {
 
@@ -25,6 +25,7 @@ public final class StatusAggregator {
 		boolean anyNoData = false;
 		boolean anyOk = false;
 		boolean anySkip = false;
+		boolean anyInfo = false;
 
 		for (PluginRunStatus status : statuses) {
 			if (status == null) {
@@ -36,6 +37,7 @@ public final class StatusAggregator {
 				case NO_DATA -> anyNoData = true;
 				case OK -> anyOk = true;
 				case SKIP -> anySkip = true;
+				case INFO -> anyInfo = true;
 			}
 		}
 
@@ -54,10 +56,13 @@ public final class StatusAggregator {
 		if (anySkip) {
 			return PluginRunStatus.SKIP;
 		}
+		if (anyInfo) {
+			return PluginRunStatus.INFO;
+		}
 		return PluginRunStatus.OK;
 	}
 
-	/** CSS class: green / orange / red / yellow / gray. */
+	/** CSS class: green / orange / red / yellow / gray / blue. */
 	public static String cssClass(PluginRunStatus status) {
 		if (status == null) {
 			return "green";
@@ -68,6 +73,7 @@ public final class StatusAggregator {
 			case FAIL -> "red";
 			case NO_DATA -> "yellow";
 			case SKIP -> "gray";
+			case INFO -> "blue";
 		};
 	}
 
@@ -81,6 +87,7 @@ public final class StatusAggregator {
 			case FAIL -> "Fail";
 			case NO_DATA -> "No Data";
 			case SKIP -> "Skip";
+			case INFO -> "Info";
 		};
 	}
 }

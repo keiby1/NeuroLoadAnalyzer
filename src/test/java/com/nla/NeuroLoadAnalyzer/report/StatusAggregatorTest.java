@@ -12,7 +12,8 @@ class StatusAggregatorTest {
 	@Test
 	void failBeatsEverything() {
 		assertEquals(PluginRunStatus.FAIL, StatusAggregator.aggregate(List.of(
-				PluginRunStatus.OK, PluginRunStatus.WARN, PluginRunStatus.SKIP, PluginRunStatus.FAIL)));
+				PluginRunStatus.OK, PluginRunStatus.WARN, PluginRunStatus.SKIP,
+				PluginRunStatus.INFO, PluginRunStatus.FAIL)));
 	}
 
 	@Test
@@ -37,5 +38,23 @@ class StatusAggregatorTest {
 	void noDataBeatsOk() {
 		assertEquals(PluginRunStatus.NO_DATA, StatusAggregator.aggregate(List.of(
 				PluginRunStatus.OK, PluginRunStatus.NO_DATA)));
+	}
+
+	@Test
+	void okBeatsInfo() {
+		assertEquals(PluginRunStatus.OK, StatusAggregator.aggregate(List.of(
+				PluginRunStatus.OK, PluginRunStatus.INFO)));
+	}
+
+	@Test
+	void skipBeatsInfo() {
+		assertEquals(PluginRunStatus.SKIP, StatusAggregator.aggregate(List.of(
+				PluginRunStatus.SKIP, PluginRunStatus.INFO)));
+	}
+
+	@Test
+	void onlyInfoYieldsInfo() {
+		assertEquals(PluginRunStatus.INFO, StatusAggregator.aggregate(List.of(
+				PluginRunStatus.INFO, PluginRunStatus.INFO)));
 	}
 }

@@ -118,6 +118,10 @@ public class AnalysisPageService {
 				    border-left-color: #9E9E9E;
 				    background: linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%);
 				  }
+				  .summary-card.blue {
+				    border-left-color: #2196F3;
+				    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+				  }
 				  .summary-card-title {
 				    font-size: 0.95em;
 				    font-weight: 600;
@@ -171,6 +175,10 @@ public class AnalysisPageService {
 				    border-left-color: #9E9E9E;
 				    background: linear-gradient(135deg, #F5F5F5 0%, #EEEEEE 100%);
 				  }
+				  .card.blue {
+				    border-left-color: #2196F3;
+				    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+				  }
 				  .card-title {
 				    font-size: 1.35em;
 				    font-weight: bold;
@@ -217,6 +225,7 @@ public class AnalysisPageService {
 				  .sub-card.yellow { border-left-color: #FF9800; }
 				  .sub-card.orange { border-left-color: #FB8C00; }
 				  .sub-card.gray { border-left-color: #9E9E9E; }
+				  .sub-card.blue { border-left-color: #2196F3; }
 				  .sub-card-title {
 				    font-weight: bold;
 				    margin-bottom: 5px;
@@ -245,6 +254,7 @@ public class AnalysisPageService {
 				  .status-indicator.yellow { background-color: #FF9800; }
 				  .status-indicator.orange { background-color: #FB8C00; }
 				  .status-indicator.gray { background-color: #9E9E9E; }
+				  .status-indicator.blue { background-color: #2196F3; }
 				  .status-label {
 				    display: inline-block;
 				    margin-left: 8px;
@@ -497,8 +507,9 @@ public class AnalysisPageService {
 		int fail = 0;
 		int warn = 0;
 		int noData = 0;
-		int skip = 0;
 		int ok = 0;
+		int skip = 0;
+		int info = 0;
 		if (results != null) {
 			for (PluginResult result : results) {
 				if (result == null || result.status() == null) {
@@ -508,8 +519,9 @@ public class AnalysisPageService {
 					case FAIL -> fail++;
 					case WARN -> warn++;
 					case NO_DATA -> noData++;
-					case SKIP -> skip++;
 					case OK -> ok++;
+					case SKIP -> skip++;
+					case INFO -> info++;
 				}
 			}
 		}
@@ -518,8 +530,9 @@ public class AnalysisPageService {
 		appendSummaryCard(html, PluginRunStatus.FAIL, fail);
 		appendSummaryCard(html, PluginRunStatus.WARN, warn);
 		appendSummaryCard(html, PluginRunStatus.NO_DATA, noData);
-		appendSummaryCard(html, PluginRunStatus.SKIP, skip);
 		appendSummaryCard(html, PluginRunStatus.OK, ok);
+		appendSummaryCard(html, PluginRunStatus.SKIP, skip);
+		appendSummaryCard(html, PluginRunStatus.INFO, info);
 		html.append("</div>");
 	}
 
