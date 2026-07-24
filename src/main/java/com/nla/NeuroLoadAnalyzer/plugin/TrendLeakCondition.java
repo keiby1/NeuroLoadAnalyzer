@@ -7,16 +7,18 @@ import java.util.Locale;
 /**
  * Detects sustained memory growth (leak) on a RANGE series of used RAM bytes.
  *
- * <p>Thresholds are starting defaults for ~12h load tests and should be calibrated on real runs.
+ * <p>Defaults calibrated for ~12h load tests: noise of ~0.1–0.5 pp host utilization → OK.
  * See {@code docs/DEV_NOTES.md}.
  */
 public final class TrendLeakCondition implements SeriesAnalysisCondition {
 
 	public static final double DEFAULT_WARMUP_HOURS = 1.0;
 	public static final double DEFAULT_MIN_ANALYZE_HOURS = 4.0;
-	public static final double DEFAULT_SLOPE_WARN_PCT_PER_HOUR = 0.05;
-	public static final double DEFAULT_SLOPE_FAIL_PCT_PER_HOUR = 0.20;
-	public static final long DEFAULT_MIN_ABS_GROWTH_BYTES = 75L * 1024L * 1024L; // 75 MiB
+	public static final double DEFAULT_SLOPE_WARN_PCT_PER_HOUR = 0.25;
+	public static final double DEFAULT_SLOPE_FAIL_PCT_PER_HOUR = 0.75;
+	public static final long DEFAULT_MIN_ABS_GROWTH_BYTES = 256L * 1024L * 1024L; // 256 MiB
+	/** Minimum end−baseline growth as % of baseline used RAM. */
+	public static final double DEFAULT_MIN_DELTA_PCT = 1.0;
 	public static final double DEFAULT_SIGNIFICANCE_ALPHA = 0.05;
 	public static final double DEFAULT_LATE_ONSET_TAIL_HOURS = 2.0;
 	public static final int DEFAULT_MIN_POINTS = 12;
@@ -26,6 +28,7 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 	private final double slopeWarnPctPerHour;
 	private final double slopeFailPctPerHour;
 	private final long minAbsGrowthBytes;
+	private final double minDeltaPct;
 	private final double significanceAlpha;
 	private final double lateOnsetTailHours;
 	private final int minPoints;
@@ -37,6 +40,7 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 				DEFAULT_SLOPE_WARN_PCT_PER_HOUR,
 				DEFAULT_SLOPE_FAIL_PCT_PER_HOUR,
 				DEFAULT_MIN_ABS_GROWTH_BYTES,
+				DEFAULT_MIN_DELTA_PCT,
 				DEFAULT_SIGNIFICANCE_ALPHA,
 				DEFAULT_LATE_ONSET_TAIL_HOURS,
 				DEFAULT_MIN_POINTS);
@@ -48,6 +52,7 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 			double slopeWarnPctPerHour,
 			double slopeFailPctPerHour,
 			long minAbsGrowthBytes,
+			double minDeltaPct,
 			double significanceAlpha,
 			double lateOnsetTailHours,
 			int minPoints) {
@@ -56,6 +61,7 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 		this.slopeWarnPctPerHour = slopeWarnPctPerHour;
 		this.slopeFailPctPerHour = slopeFailPctPerHour;
 		this.minAbsGrowthBytes = minAbsGrowthBytes;
+		this.minDeltaPct = Math.max(0, minDeltaPct);
 		this.significanceAlpha = significanceAlpha;
 		this.lateOnsetTailHours = lateOnsetTailHours;
 		this.minPoints = minPoints;
@@ -68,8 +74,9 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 	@Override
 	public String description() {
 		return String.format(Locale.ROOT,
-				"RAM growth/leak: Sen+MK, warn≥%.2f%%/h, fail≥%.2f%%/h (calibrate on 12h runs)",
-				slopeWarnPctPerHour, slopeFailPctPerHour);
+				"RAM growth/leak: Sen+MK, warn≥%.2f%%/h, fail≥%.2f%%/h, minΔ≥%.0f%% / %d MiB",
+				slopeWarnPctPerHour, slopeFailPctPerHour, minDeltaPct,
+				minAbsGrowthBytes / (1024 * 1024));
 	}
 
 	@Override
@@ -100,9 +107,9 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 		}
 
 		TrendStatistics.FitResult fit = TrendStatistics.fit(analyzed, significanceAlpha);
-		double baseline = analyzed.get(0).value();
+		double baseline = medianFirst(analyzed, Math.min(6, analyzed.size()));
 		if (baseline <= 0) {
-			baseline = medianFirst(analyzed, Math.min(6, analyzed.size()));
+			baseline = analyzed.get(0).value();
 		}
 		if (baseline <= 0) {
 			return SeriesVerdict.of(PluginRunStatus.WARN, "Некорректный baseline (≤0), анализ роста невозможен");
@@ -110,10 +117,11 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 
 		double slopeBytesPerHour = fit.senSlopePerSec() * 3600.0;
 		double slopePctPerHour = (slopeBytesPerHour / baseline) * 100.0;
-		double deltaAbs = analyzed.get(analyzed.size() - 1).value() - analyzed.get(0).value();
+		double end = analyzed.get(analyzed.size() - 1).value();
+		double deltaAbs = end - baseline;
 		double deltaPct = (deltaAbs / baseline) * 100.0;
 
-		if (isLateOnsetOnly(analyzed)) {
+		if (isLateOnsetOnly(analyzed, baseline)) {
 			return evidence(
 					SeriesVerdict.of(PluginRunStatus.WARN,
 							String.format(Locale.ROOT,
@@ -131,7 +139,7 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 					analyzed, fit, slopeBytesPerHour, slopePctPerHour, deltaAbs, deltaPct);
 		}
 
-		if (isStepChangeOnly(analyzed)) {
+		if (isStepChangeOnly(analyzed, baseline)) {
 			return evidence(
 					SeriesVerdict.of(PluginRunStatus.WARN,
 							String.format(Locale.ROOT,
@@ -144,8 +152,17 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 			return evidence(
 					SeriesVerdict.of(PluginRunStatus.OK,
 							String.format(Locale.ROOT,
-									"Прирост слишком мал для FAIL (Δ=%.1f МиБ < min %.0f МиБ)",
+									"Прирост слишком мал (Δ=%.1f МиБ < min %.0f МиБ)",
 									deltaAbs / (1024 * 1024), minAbsGrowthBytes / (1024.0 * 1024.0))),
+					analyzed, fit, slopeBytesPerHour, slopePctPerHour, deltaAbs, deltaPct);
+		}
+
+		if (deltaPct < minDeltaPct) {
+			return evidence(
+					SeriesVerdict.of(PluginRunStatus.OK,
+							String.format(Locale.ROOT,
+									"Относительный прирост слишком мал (Δ=%.2f%% < min %.2f%% от baseline used)",
+									deltaPct, minDeltaPct)),
 					analyzed, fit, slopeBytesPerHour, slopePctPerHour, deltaAbs, deltaPct);
 		}
 
@@ -197,7 +214,7 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 	 * Step-change heuristic: first half has most of the jump; second-half Sen slope ≈ flat
 	 * while overall delta is large.
 	 */
-	boolean isStepChangeOnly(List<MetricPoint> series) {
+	boolean isStepChangeOnly(List<MetricPoint> series, double baseline) {
 		if (series.size() < minPoints) {
 			return false;
 		}
@@ -212,16 +229,15 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 		}
 		TrendStatistics.FitResult secondFit = TrendStatistics.fit(second, significanceAlpha);
 		double secondSlopePerHour = secondFit.senSlopePerSec() * 3600.0;
-		double baseline = Math.max(series.get(0).value(), 1.0);
-		double secondPctPerHour = (secondSlopePerHour / baseline) * 100.0;
-		// Most growth in first half, second half nearly flat
+		double base = Math.max(baseline, 1.0);
+		double secondPctPerHour = (secondSlopePerHour / base) * 100.0;
 		return d1 > 0.7 * total && d2 < 0.25 * total && secondPctPerHour < slopeWarnPctPerHour;
 	}
 
 	/**
 	 * Late-onset: head of series flat/insignificant; significant growth concentrated in the tail.
 	 */
-	boolean isLateOnsetOnly(List<MetricPoint> series) {
+	boolean isLateOnsetOnly(List<MetricPoint> series, double baseline) {
 		if (series.size() < minPoints || durationHours(series) < minAnalyzeHours) {
 			return false;
 		}
@@ -234,9 +250,9 @@ public final class TrendLeakCondition implements SeriesAnalysisCondition {
 		}
 		TrendStatistics.FitResult headFit = TrendStatistics.fit(head, significanceAlpha);
 		TrendStatistics.FitResult tailFit = TrendStatistics.fit(tail, significanceAlpha);
-		double baseline = Math.max(series.get(0).value(), 1.0);
-		double headPct = (headFit.senSlopePerSec() * 3600.0 / baseline) * 100.0;
-		double tailPct = (tailFit.senSlopePerSec() * 3600.0 / baseline) * 100.0;
+		double base = Math.max(baseline, 1.0);
+		double headPct = (headFit.senSlopePerSec() * 3600.0 / base) * 100.0;
+		double tailPct = (tailFit.senSlopePerSec() * 3600.0 / base) * 100.0;
 		boolean headFlat = !headFit.significant() || headPct < slopeWarnPctPerHour;
 		boolean tailGrowing = tailFit.significant() && tailPct >= slopeWarnPctPerHour && tailFit.senSlopePerSec() > 0;
 		return headFlat && tailGrowing && durationHours(tail) <= lateOnsetTailHours + 0.25;

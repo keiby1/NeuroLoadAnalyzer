@@ -37,7 +37,10 @@ K8S: `k8sThreshold` / `k8sSeries` + `WorkloadMetric`.
 ### RAM growth / leak
 - PromQL: used bytes (`MemTotal - MemAvailable`), часто с `avg_over_time(...[5m:1m])`.
 - `query_range` + Sen’s slope / Mann–Kendall, warmup 1ч, min window 4ч.
-- Пороги (калибровать на 12ч прогонах): warn ≥0.05%/ч, fail ≥0.20%/ч, min Δ ≈75 МиБ.
+- Baseline = медиана первых точек (не первая — меньше ложных WARN от провалов).
+- Пороги (калибровка под 12ч; шум ±0.5 п.п. утилизации хоста → OK):
+  - warn ≥ **0.25**/ч, fail ≥ **0.75**/ч (% от baseline used);
+  - min Δ ≥ **256 MiB** и ≥ **1%** baseline used.
 
 ## Каталог правил
 - Интерфейс `AnalysisPluginCatalog`.

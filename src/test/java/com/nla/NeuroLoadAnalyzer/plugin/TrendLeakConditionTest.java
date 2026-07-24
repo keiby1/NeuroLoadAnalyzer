@@ -20,14 +20,32 @@ class TrendLeakConditionTest {
 	}
 
 	@Test
+	void tinyDriftWithOscillationIsOk() {
+		// ~0.2% of used over 12h (like 49.5% → 49.6% host util noise) + mid swings
+		double baseline = 32L * 1024 * 1024 * 1024; // 32 GiB used
+		List<MetricPoint> series = new ArrayList<>();
+		long t0 = 1_700_000_000L;
+		int step = 900; // 15 min
+		int steps = 12 * 4;
+		for (int i = 0; i <= steps; i++) {
+			double hours = (i * step) / 3600.0;
+			double drift = baseline * 0.002 * (hours / 12.0);
+			double wobble = baseline * 0.005 * Math.sin(hours);
+			series.add(new MetricPoint(t0 + (long) i * step, baseline + drift + wobble));
+		}
+		SeriesVerdict verdict = condition.evaluate(series);
+		assertEquals(PluginRunStatus.OK, verdict.status(), verdict.reason());
+	}
+
+	@Test
 	void strongLinearGrowthIsFail() {
-		// ~0.3%/hour of 10 GiB baseline after warmup
+		// ~1%/hour of 10 GiB baseline after warmup → above fail 0.75%/h
 		double baseline = 10L * 1024 * 1024 * 1024;
-		double perHour = baseline * 0.003;
+		double perHour = baseline * 0.01;
 		List<MetricPoint> series = linearSeries(14, 3600, baseline, perHour);
 		SeriesVerdict verdict = condition.evaluate(series);
 		assertEquals(PluginRunStatus.FAIL, verdict.status(), verdict.reason());
-		assertTrue(verdict.slopePctPerHour() != null && verdict.slopePctPerHour() >= 0.2, verdict.reason());
+		assertTrue(verdict.slopePctPerHour() != null && verdict.slopePctPerHour() >= 0.75, verdict.reason());
 	}
 
 	@Test
