@@ -228,6 +228,9 @@ K8S **RAM usage** — `max_over_time(working_set)[$range:$step]` / limit (без
 `FAIL > WARN > NO_DATA > OK > SKIP > INFO` (INFO — только если все дети INFO).
 Цвета: OK=green, Warn=orange, Fail=red, NoData=yellow, Skip=gray, Info=blue.
 
+**Вердикт прогона** (`AnalysisVerdict` / `VerdictMapper`): по статусам top-блоков VM/K8S
+→ Успешно / С замечаниями / Недостаточно данных / Неуспешно. Баннер над summary-карточками.
+
 ---
 
 ## 8. Структура пакетов (текущий каркас)

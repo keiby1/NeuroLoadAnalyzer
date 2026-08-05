@@ -3,6 +3,7 @@ package com.nla.NeuroLoadAnalyzer.service;
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisReport;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginResult;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginRunStatus;
+import com.nla.NeuroLoadAnalyzer.report.AnalysisVerdict;
 import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder.PurposeReportNode;
 import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder.SoftwareReportNode;
 import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder.TypeReportGroup;
@@ -84,6 +85,45 @@ public class AnalysisPageService {
 				    font-size: .95rem;
 				    margin: 0 0 1.25rem;
 				    text-align: left;
+				  }
+				  .verdict-banner {
+				    display: flex;
+				    align-items: center;
+				    gap: 12px;
+				    border-radius: 12px;
+				    padding: 14px 18px;
+				    margin: 0 0 18px;
+				    border-left: 6px solid;
+				    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+				  }
+				  .verdict-banner.green {
+				    border-left-color: #4CAF50;
+				    background: linear-gradient(135deg, #E8F5E8 0%, #F1F8E9 100%);
+				  }
+				  .verdict-banner.orange {
+				    border-left-color: #FB8C00;
+				    background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
+				  }
+				  .verdict-banner.yellow {
+				    border-left-color: #FF9800;
+				    background: linear-gradient(135deg, #FFF8E1 0%, #FFF3E0 100%);
+				  }
+				  .verdict-banner.red {
+				    border-left-color: #F44336;
+				    background: linear-gradient(135deg, #FFEBEE 0%, #FCE4EC 100%);
+				  }
+				  .verdict-banner-label {
+				    font-size: 0.85rem;
+				    font-weight: 600;
+				    color: #666;
+				    text-transform: uppercase;
+				    letter-spacing: 0.04em;
+				  }
+				  .verdict-banner-value {
+				    font-size: 1.35rem;
+				    font-weight: 700;
+				    color: #222;
+				    line-height: 1.2;
 				  }
 				  #status {
 				    display: flex;
@@ -717,6 +757,7 @@ public class AnalysisPageService {
 				.append(esc(formatTimeWindow(report.timeRange())))
 				.append("</p>");
 
+		appendVerdictBanner(html, report.verdict());
 		appendSummaryCards(html, report.pluginResults());
 
 		if (report.typeGroups().isEmpty()) {
@@ -750,6 +791,17 @@ public class AnalysisPageService {
 		}
 
 		return html.toString();
+	}
+
+	private static void appendVerdictBanner(StringBuilder html, AnalysisVerdict verdict) {
+		AnalysisVerdict v = verdict != null ? verdict : AnalysisVerdict.INSUFFICIENT_DATA;
+		html.append("<div class=\"verdict-banner ").append(v.cssClass()).append("\" role=\"status\">")
+				.append("<span class=\"status-indicator ").append(v.cssClass()).append("\"></span>")
+				.append("<div>")
+				.append("<div class=\"verdict-banner-label\">Вердикт</div>")
+				.append("<div class=\"verdict-banner-value\">").append(esc(v.labelRu())).append("</div>")
+				.append("</div>")
+				.append("</div>");
 	}
 
 	private void appendSummaryCards(StringBuilder html, java.util.List<PluginResult> results) {

@@ -19,6 +19,11 @@ K8S: `k8sThreshold` / `k8sSeries` + `WorkloadMetric`.
 - INFO поднимает родителя **только** если все потомки INFO.
 - Summary: `Fail | Warn | No Data | OK | Skip | Info` (синий Info).
 
+### Вердикт отчёта
+Считается по статусам **top-блоков** (`TypeReportGroup`: VM и/или K8S) через `StatusAggregator`, затем map:
+`FAIL→Неуспешно`, `WARN|INFO→С замечаниями`, `NO_DATA|SKIP→Недостаточно данных`, `OK→Успешно`, пусто→Недостаточно данных.
+Классы: `AnalysisVerdict`, `VerdictMapper`. Баннер над summary в HTML.
+
 ### Полосы (`BandedThresholdCondition`)
 - CPU/RAM: <78 OK · [78; 80) WARN · ≥80 FAIL.
 - Throttle %: ≤1 OK · (1; 3] INFO · (3; 7] WARN · >7 FAIL.

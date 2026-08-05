@@ -10,8 +10,10 @@ import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPluginCatalog;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginAnalysisService;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginResult;
 import com.nla.NeuroLoadAnalyzer.plugin.catalog.ExamplePluginCatalog;
+import com.nla.NeuroLoadAnalyzer.report.AnalysisVerdict;
 import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder;
 import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder.TypeReportGroup;
+import com.nla.NeuroLoadAnalyzer.report.VerdictMapper;
 import com.nla.NeuroLoadAnalyzer.util.TimeRange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,18 +63,21 @@ public class AnalysisService {
 
 		List<PluginResult> pluginResults = pluginAnalysisService.runAll(request, timeRange);
 		List<TypeReportGroup> typeGroups = ReportTreeBuilder.build(pluginResults);
+		AnalysisVerdict verdict = VerdictMapper.fromTypeGroups(typeGroups);
 		String catalogSource = pluginCatalog instanceof ExamplePluginCatalog
 				? "ExamplePluginCatalog"
 				: pluginCatalog.getClass().getSimpleName();
 
-		log.info("Analysis complete: typedTargets={}, k8sNamespaces={}, pluginRuns={}, typeGroups={}, catalog={}",
-				typedTargets.size(), k8sNamespaces.size(), pluginResults.size(), typeGroups.size(), catalogSource);
+		log.info("Analysis complete: typedTargets={}, k8sNamespaces={}, pluginRuns={}, typeGroups={}, verdict={}, catalog={}",
+				typedTargets.size(), k8sNamespaces.size(), pluginResults.size(), typeGroups.size(),
+				verdict, catalogSource);
 
 		AnalysisReport report = new AnalysisReport(
 				timeRange,
 				typedTargets,
 				pluginResults,
 				typeGroups,
+				verdict,
 				catalogSource);
 
 		return analysisPageService.renderReport(report);

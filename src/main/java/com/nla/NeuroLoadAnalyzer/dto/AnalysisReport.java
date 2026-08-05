@@ -1,6 +1,7 @@
 package com.nla.NeuroLoadAnalyzer.dto;
 
 import com.nla.NeuroLoadAnalyzer.plugin.PluginResult;
+import com.nla.NeuroLoadAnalyzer.report.AnalysisVerdict;
 import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder.TypeReportGroup;
 import com.nla.NeuroLoadAnalyzer.util.TimeRange;
 
@@ -14,6 +15,7 @@ public record AnalysisReport(
 		List<TypedTarget> typedTargets,
 		List<PluginResult> pluginResults,
 		List<TypeReportGroup> typeGroups,
+		AnalysisVerdict verdict,
 		String catalogSource
 ) {
 }
