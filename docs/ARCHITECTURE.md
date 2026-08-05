@@ -192,9 +192,9 @@ Auth **не используется** (доступ во внутренней �
 Summary: `Fail | Warn | No Data | OK | Skip | Info`.
 
 Полосы: CPU/RAM <78 OK / [78; 80) WARN / ≥80 FAIL; throttle ≤1 OK / (1;3] INFO / (3;7] WARN / >7 FAIL; TCP 12k/16k (INFO soft, hard ≥).
-VM **CPU max** — сглаженный max за период (`rate[5m]` → `max_over_time[$range:$step]`).
-VM **RAM usage** — peak % за период (`max_over_time` по gauge MemAvailable, без `rate[5m]`).
-K8S **RAM usage** — уже `max_over_time(working_set)[$range:$step]` / limit (без rate-сглаживания).
+VM/K8S **CPU**: две проверки — `rate[5m]` и `rate[1m]` + `max_over_time` (bands 78/80).
+VM **RAM usage** — peak % за период (`max_over_time` по gauge MemAvailable, без `rate`).
+K8S **RAM usage** — `max_over_time(working_set)[$range:$step]` / limit (без rate-сглаживания).
 
 Отчёт группируется:
 - **VM:** Тип → Софт → Назначение → значение параметра → проверки;

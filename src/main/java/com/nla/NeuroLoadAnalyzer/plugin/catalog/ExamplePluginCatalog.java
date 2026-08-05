@@ -27,10 +27,19 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 			""".trim();
 
 	/** Smoothed max CPU %% over from–to: avg window 5m, then max_over_time. */
-	private static final String VM_CPU_MAX = """
+	private static final String VM_CPU_MAX_5M = """
 			max_over_time(
 			  (
 			    100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle", instance=~"$VM"}[5m])) * 100)
+			  )[$range:$step]
+			)
+			""".trim();
+
+	/** Finer max CPU %%: rate window 1m, then max_over_time. */
+	private static final String VM_CPU_MAX_1M = """
+			max_over_time(
+			  (
+			    100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle", instance=~"$VM"}[1m])) * 100)
 			  )[$range:$step]
 			)
 			""".trim();
@@ -49,8 +58,13 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 			)
 			""".trim();
 
-	private static final String K8S_CPU_DOC = """
+	private static final String K8S_CPU_DOC_5M = """
 			max_over_time(rate(container_cpu_usage_seconds_total{container!="",container!="POD",namespace="$namespace"}[5m])[$range:$step])
+			/ limits → %; max across pods then containers
+			""".trim();
+
+	private static final String K8S_CPU_DOC_1M = """
+			max_over_time(rate(container_cpu_usage_seconds_total{container!="",container!="POD",namespace="$namespace"}[1m])[$range:$step])
 			/ limits → %; max across pods then containers
 			""".trim();
 
@@ -85,9 +99,14 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 	public List<AnalysisPlugin> getPlugins() {
 		return List.of(
 				new AnalysisPlugin(
-						"CPU max",
+						"CPU max [5m]",
 						"VM",
-						VM_CPU_MAX,
+						VM_CPU_MAX_5M,
+						BandedThresholdCondition.warnThenFail(78, 80)),
+				new AnalysisPlugin(
+						"CPU max [1m]",
+						"VM",
+						VM_CPU_MAX_1M,
 						BandedThresholdCondition.warnThenFail(78, 80)),
 				new AnalysisPlugin(
 						"RAM usage",
@@ -115,10 +134,15 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 						""".trim(),
 						BandedThresholdCondition.infoThenFailInclusive(12_000, 16_000)),
 				AnalysisPlugin.k8sThreshold(
-						"CPU usage",
-						K8S_CPU_DOC,
+						"CPU usage [5m]",
+						K8S_CPU_DOC_5M,
 						BandedThresholdCondition.warnThenFail(78, 80),
 						WorkloadMetric.K8S_CPU_MAX_PERCENT),
+				AnalysisPlugin.k8sThreshold(
+						"CPU usage [1m]",
+						K8S_CPU_DOC_1M,
+						BandedThresholdCondition.warnThenFail(78, 80),
+						WorkloadMetric.K8S_CPU_MAX_PERCENT_1M),
 				AnalysisPlugin.k8sThreshold(
 						"RAM usage",
 						K8S_MEM_DOC,

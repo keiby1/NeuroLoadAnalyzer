@@ -27,9 +27,11 @@ K8S: `k8sThreshold` / `k8sSeries` + `WorkloadMetric`.
 - Restarts: single `> 0` → FAIL.
 - Throttling trend: OK / FAIL(рост) / INFO(мало данных).
 
-### VM CPU max
-Сглаженный max за from–to: `max_over_time((100 - avg(rate(...idle...[5m]))*100)[$range:$step])`, bands 78/80.
-Имя в отчёте: **CPU max**.
+### VM / K8S CPU max
+Две проверки с одинаковыми bands 78/80:
+- **[5m]** — устойчивый max (`rate[5m]` → `max_over_time`); короткие минутные пики сглаживаются.
+- **[1m]** — точнее для пиков ~1м (`rate[1m]` → `max_over_time`); всё ещё среднее за минуту, не irate по scrape.
+Имена: VM `CPU max [5m]` / `CPU max [1m]`; K8S `CPU usage [5m]` / `CPU usage [1m]`.
 
 ### VM RAM usage
 Peak % за from–to (gauge, без `rate`): `max_over_time((100*(1-MemAvailable/MemTotal))[$range:$step])`, bands 78/80.

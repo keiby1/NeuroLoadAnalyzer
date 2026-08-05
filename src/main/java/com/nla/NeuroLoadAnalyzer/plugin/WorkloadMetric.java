@@ -6,7 +6,10 @@ package com.nla.NeuroLoadAnalyzer.plugin;
  */
 public enum WorkloadMetric {
 	NONE,
+	/** Peak CPU %% via rate[cpu-rate-window] (default 5m), then max_over_time. */
 	K8S_CPU_MAX_PERCENT,
+	/** Peak CPU %% via rate[1m], then max_over_time — catches ~1m spikes better. */
+	K8S_CPU_MAX_PERCENT_1M,
 	K8S_MEM_MAX_PERCENT,
 	K8S_RESTART_INCREASE,
 	K8S_THROTTLING_MAX_PERCENT,

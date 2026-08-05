@@ -260,12 +260,13 @@ public class K8sWorkloadService {
 		boolean sumThenPercent = "sum_then_percent".equalsIgnoreCase(properties.getAggregationMethod());
 		int cpuAvgPercent;
 		int cpuMaxPercent;
+		int cpuMaxPercent1m;
 		int memAvgPercent;
 		int memMaxPercent;
 
 		if (sumThenPercent) {
 			double sumCpuAvg = 0, sumMemAvg = 0, sumCpuLim = 0, sumMemLim = 0;
-			double cpuMaxPct = 0, memMaxPct = 0;
+			double cpuMaxPct = 0, cpuMaxPct1m = 0, memMaxPct = 0;
 			for (ContainerKey ck : keys) {
 				UsageValues uv = usage.get(ck);
 				ResourceValues res = resources.get(ck);
@@ -285,14 +286,16 @@ public class K8sWorkloadService {
 				sumCpuLim += cpuLim;
 				sumMemLim += memLim;
 				cpuMaxPct = Math.max(cpuMaxPct, toPercent(uv.cpuMaxCores, cpuLim));
+				cpuMaxPct1m = Math.max(cpuMaxPct1m, toPercent(uv.cpuMaxCores1m, cpuLim));
 				memMaxPct = Math.max(memMaxPct, toPercent(uv.memMaxBytes, memLim));
 			}
 			cpuAvgPercent = sumCpuLim > 0 ? (int) Math.round(toPercent(sumCpuAvg, sumCpuLim)) : 0;
 			cpuMaxPercent = (int) Math.round(cpuMaxPct);
+			cpuMaxPercent1m = (int) Math.round(cpuMaxPct1m);
 			memAvgPercent = sumMemLim > 0 ? (int) Math.round(toPercent(sumMemAvg, sumMemLim)) : 0;
 			memMaxPercent = (int) Math.round(memMaxPct);
 		} else {
-			double cpuAvgSum = 0, cpuMaxMax = 0, memAvgSum = 0, memMaxMax = 0;
+			double cpuAvgSum = 0, cpuMaxMax = 0, cpuMaxMax1m = 0, memAvgSum = 0, memMaxMax = 0;
 			int n = 0;
 			for (ContainerKey ck : keys) {
 				UsageValues uv = usage.get(ck);
@@ -310,12 +313,14 @@ public class K8sWorkloadService {
 				}
 				cpuAvgSum += toPercent(uv.cpuAvgCores, cpuLim);
 				cpuMaxMax = Math.max(cpuMaxMax, toPercent(uv.cpuMaxCores, cpuLim));
+				cpuMaxMax1m = Math.max(cpuMaxMax1m, toPercent(uv.cpuMaxCores1m, cpuLim));
 				memAvgSum += toPercent(uv.memAvgBytes, memLim);
 				memMaxMax = Math.max(memMaxMax, toPercent(uv.memMaxBytes, memLim));
 				n++;
 			}
 			cpuAvgPercent = n > 0 ? (int) Math.round(cpuAvgSum / n) : 0;
 			cpuMaxPercent = (int) Math.round(cpuMaxMax);
+			cpuMaxPercent1m = (int) Math.round(cpuMaxMax1m);
 			memAvgPercent = n > 0 ? (int) Math.round(memAvgSum / n) : 0;
 			memMaxPercent = (int) Math.round(memMaxMax);
 		}
@@ -339,6 +344,7 @@ public class K8sWorkloadService {
 		return new K8sContainer(
 				containerName,
 				cpuMaxPercent,
+				cpuMaxPercent1m,
 				memMaxPercent,
 				cpuAvgPercent,
 				memAvgPercent,
@@ -504,6 +510,8 @@ public class K8sWorkloadService {
 		}
 	}
 
+	private static final String CPU_RATE_WINDOW_1M = "1m";
+
 	private Map<ContainerKey, UsageValues> queryContainerUsage(String range, String namespace, Long evaluationTimeSec) {
 		Map<ContainerKey, UsageValues> out = new HashMap<>();
 		String step = properties.getSubqueryStep();
@@ -516,6 +524,12 @@ public class K8sWorkloadService {
 				(uv, v) -> uv.cpuAvgCores = v, evaluationTimeSec);
 		fillUsageMetric(out, "max_over_time(" + cpuRate + "[" + range + ":" + step + "])",
 				(uv, v) -> uv.cpuMaxCores = v, evaluationTimeSec);
+
+		String cpuRate1m = addNamespaceFilter(
+				"rate(container_cpu_usage_seconds_total{container!=\"\",container!=\"POD\"}[" + CPU_RATE_WINDOW_1M + "])",
+				namespace);
+		fillUsageMetric(out, "max_over_time(" + cpuRate1m + "[" + range + ":" + step + "])",
+				(uv, v) -> uv.cpuMaxCores1m = v, evaluationTimeSec);
 
 		String mem = addNamespaceFilter(
 				"container_memory_working_set_bytes{container!=\"\",container!=\"POD\"}",
@@ -640,7 +654,7 @@ public class K8sWorkloadService {
 	}
 
 	private static class UsageValues {
-		double cpuAvgCores, cpuMaxCores, memAvgBytes, memMaxBytes;
+		double cpuAvgCores, cpuMaxCores, cpuMaxCores1m, memAvgBytes, memMaxBytes;
 
 		void apply(java.util.function.BiConsumer<UsageValues, Double> setter, double v) {
 			setter.accept(this, v);

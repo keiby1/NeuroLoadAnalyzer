@@ -16,6 +16,10 @@ public record K8sWorkload(
 		return containers.stream().mapToInt(K8sContainer::cpuMaxPercent).max().orElse(0);
 	}
 
+	public int maxCpuPercent1m() {
+		return containers.stream().mapToInt(K8sContainer::cpuMaxPercent1m).max().orElse(0);
+	}
+
 	public int maxMemPercent() {
 		return containers.stream().mapToInt(K8sContainer::memMaxPercent).max().orElse(0);
 	}

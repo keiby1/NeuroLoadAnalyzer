@@ -201,6 +201,7 @@ public class PluginAnalysisService {
 				.replace("$range", timeRange.rangeForPromQl());
 		switch (plugin.workloadMetric()) {
 			case K8S_CPU_MAX_PERCENT -> value = workload.maxCpuPercent();
+			case K8S_CPU_MAX_PERCENT_1M -> value = workload.maxCpuPercent1m();
 			case K8S_MEM_MAX_PERCENT -> value = workload.maxMemPercent();
 			case K8S_RESTART_INCREASE -> value = workload.totalRestartIncrease();
 			case K8S_THROTTLING_MAX_PERCENT -> value = workload.maxThrottlingPercent();
@@ -236,6 +237,9 @@ public class PluginAnalysisService {
 			case K8S_CPU_MAX_PERCENT -> Comparator
 					.comparingInt(K8sContainer::cpuMaxPercent).reversed()
 					.thenComparing(K8sContainer::name, Comparator.nullsLast(String::compareTo));
+			case K8S_CPU_MAX_PERCENT_1M -> Comparator
+					.comparingInt(K8sContainer::cpuMaxPercent1m).reversed()
+					.thenComparing(K8sContainer::name, Comparator.nullsLast(String::compareTo));
 			case K8S_MEM_MAX_PERCENT -> Comparator
 					.comparingInt(K8sContainer::memMaxPercent).reversed()
 					.thenComparing(K8sContainer::name, Comparator.nullsLast(String::compareTo));
@@ -258,6 +262,7 @@ public class PluginAnalysisService {
 			String name = c.name() == null || c.name().isBlank() ? "?" : c.name();
 			String line = switch (metric) {
 				case K8S_CPU_MAX_PERCENT -> name + ": max " + c.cpuMaxPercent() + "% · avg " + c.cpuAvgPercent() + "%";
+				case K8S_CPU_MAX_PERCENT_1M -> name + ": max " + c.cpuMaxPercent1m() + "%";
 				case K8S_MEM_MAX_PERCENT -> name + ": max " + c.memMaxPercent() + "% · avg " + c.memAvgPercent() + "%";
 				case K8S_THROTTLING_MAX_PERCENT -> name + ": " + c.throttlingPercent() + "%";
 				case K8S_RESTART_INCREASE -> name + ": +" + formatRestartIncrease(c.restartIncrease());
