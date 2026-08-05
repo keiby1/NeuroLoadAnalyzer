@@ -39,14 +39,28 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 			)
 			""".trim();
 
+	/** Peak RAM %% over from–to (gauge, no rate window). */
+	private static final String VM_RAM_MAX = """
+			max_over_time(
+			  (
+			    max by (instance) (
+			      100 * (1 - (
+			        node_memory_MemAvailable_bytes{instance=~"$VM"}
+			        / node_memory_MemTotal_bytes{instance=~"$VM"}
+			      ))
+			    )
+			  )[$range:$step]
+			)
+			""".trim();
+
 	private static final String K8S_CPU_DOC = """
 			max_over_time(rate(container_cpu_usage_seconds_total{container!="",container!="POD",namespace="$namespace"}[5m])[$range:$step])
-			/ limits (sum_then_percent by deployment)
+			/ limits → %; max across pods then containers
 			""".trim();
 
 	private static final String K8S_MEM_DOC = """
 			max_over_time(container_memory_working_set_bytes{container!="",container!="POD",namespace="$namespace"}[$range:$step])
-			/ limits (sum_then_percent by deployment)
+			/ limits → %; max across pods then containers (no rate smoothing)
 			""".trim();
 
 	private static final String K8S_RESTART_DOC = """
@@ -82,9 +96,7 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 				new AnalysisPlugin(
 						"RAM usage",
 						"VM",
-						"""
-						max(100*(1-(node_memory_MemAvailable_bytes{instance=~"$VM"} / node_memory_MemTotal_bytes{instance=~"$VM"}))) by (instance)
-						""".trim(),
+						VM_RAM_MAX,
 						BandedThresholdCondition.warnThenFail(78, 80)),
 				AnalysisPlugin.range(
 						"RAM growth / leak",

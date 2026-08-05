@@ -28,8 +28,12 @@ K8S: `k8sThreshold` / `k8sSeries` + `WorkloadMetric`.
 - Throttling trend: OK / FAIL(рост) / INFO(мало данных).
 
 ### VM CPU max
-Сглаженный max за from–to: `max_over_time((100 - avg(rate(...idle...[5m]))*100)[$range:$step])`, bands 80/90.
+Сглаженный max за from–to: `max_over_time((100 - avg(rate(...idle...[5m]))*100)[$range:$step])`, bands 78/80.
 Имя в отчёте: **CPU max**.
+
+### VM RAM usage
+Peak % за from–to (gauge, без `rate`): `max_over_time((100*(1-MemAvailable/MemTotal))[$range:$step])`, bands 78/80.
+Не снимок на `to` — ловит пик за весь интервал.
 
 ### Follow-up (не реализовано)
 **CPU time above 80%** — доля времени CPU > 80%: ≤1% OK · (1%; 5%] INFO · >5% FAIL.
