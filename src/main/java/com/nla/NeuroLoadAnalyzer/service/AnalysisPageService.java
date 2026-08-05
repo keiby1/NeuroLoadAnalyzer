@@ -35,9 +35,10 @@ public class AnalysisPageService {
 				  .wrap { max-width: 1200px; margin: 0 auto; }
 				  .page-header {
 				    display: flex;
-				    align-items: baseline;
-				    justify-content: flex-start;
+				    align-items: center;
+				    justify-content: space-between;
 				    margin-bottom: 20px;
+				    gap: 12px;
 				  }
 				  .brand {
 				    text-align: left;
@@ -45,6 +46,38 @@ public class AnalysisPageService {
 				    font-size: 1.5em;
 				    font-weight: 700;
 				    letter-spacing: 0.02em;
+				  }
+				  .nla-save-btn {
+				    display: none;
+				    align-items: center;
+				    justify-content: center;
+				    width: 40px;
+				    height: 40px;
+				    padding: 0;
+				    border: 1px solid #ddd;
+				    border-radius: 8px;
+				    background: #fff;
+				    color: #444;
+				    cursor: pointer;
+				    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+				    flex-shrink: 0;
+				  }
+				  .nla-save-btn.visible {
+				    display: inline-flex;
+				  }
+				  .nla-save-btn:hover {
+				    background: #f0f7f0;
+				    border-color: #4CAF50;
+				    color: #2e7d32;
+				  }
+				  .nla-save-btn:focus-visible {
+				    outline: 2px solid #4CAF50;
+				    outline-offset: 2px;
+				  }
+				  .nla-save-btn svg {
+				    width: 22px;
+				    height: 22px;
+				    display: block;
 				  }
 				  .nla-meta {
 				    color: #666;
@@ -394,6 +427,13 @@ public class AnalysisPageService {
 				<div class="wrap">
 				  <div class="page-header">
 				    <div class="brand">NLA</div>
+				    <button type="button" class="nla-save-btn" id="nla-save-btn"
+				      title="Сохранить отчёт (HTML)" aria-label="Сохранить отчёт">
+				      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+				        <path fill="currentColor"
+				          d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM6 8V4h9v4H6z"/>
+				      </svg>
+				    </button>
 				  </div>
 				  <div id="status" aria-live="polite">
 				    <div class="spinner" aria-hidden="true"></div>
@@ -407,6 +447,79 @@ public class AnalysisPageService {
 				    <div id="nla-modal-body" class="nla-modal-body"></div>
 				  </div>
 				</div>
+				<script type="text/plain" id="nla-offline-script">
+				function toggleNlaCard(card) {
+				  var sub = card.querySelector(":scope > .sub-cards");
+				  if (!sub) return;
+				  if (sub.classList.contains("show")) {
+				    sub.classList.remove("show");
+				    card.classList.remove("expanded");
+				  } else {
+				    sub.classList.add("show");
+				    card.classList.add("expanded");
+				  }
+				}
+				function applyStatusFilter(root, status) {
+				  if (!root) return;
+				  root.querySelectorAll(".summary-card").forEach(function (c) {
+				    c.classList.remove("filter-active");
+				  });
+				  root.querySelectorAll(".nla-filter-hidden").forEach(function (el) {
+				    el.classList.remove("nla-filter-hidden");
+				  });
+				  if (!status) return;
+				  var active = null;
+				  root.querySelectorAll(".summary-card").forEach(function (c) {
+				    if (c.getAttribute("data-status") === status) active = c;
+				  });
+				  if (active) active.classList.add("filter-active");
+				  root.querySelectorAll(".metric-detail-card").forEach(function (leaf) {
+				    if (!leaf.classList.contains(status)) {
+				      leaf.classList.add("nla-filter-hidden");
+				      return;
+				    }
+				    var el = leaf.parentElement;
+				    while (el && el !== root) {
+				      if (el.classList && el.classList.contains("sub-cards")) {
+				        el.classList.add("show");
+				        if (el.parentElement) el.parentElement.classList.add("expanded");
+				      }
+				      el = el.parentElement;
+				    }
+				  });
+				  Array.from(root.querySelectorAll(".sub-card.has-children, .card.has-children, .type-group"))
+				    .reverse()
+				    .forEach(function (container) {
+				      if (!container.querySelector(".metric-detail-card:not(.nla-filter-hidden)")) {
+				        container.classList.add("nla-filter-hidden");
+				      }
+				    });
+				}
+				function initOfflineReport(root) {
+				  if (!root) return;
+				  root.querySelectorAll(".card.has-children, .sub-card.has-children").forEach(function (card) {
+				    card.addEventListener("click", function (e) {
+				      var sub = card.querySelector(":scope > .sub-cards");
+				      if (sub && sub.contains(e.target)) return;
+				      e.stopPropagation();
+				      toggleNlaCard(card);
+				    });
+				  });
+				  var activeFilterStatus = null;
+				  root.querySelectorAll(".summary-card").forEach(function (card) {
+				    card.addEventListener("click", function (e) {
+				      e.stopPropagation();
+				      var status = card.getAttribute("data-status");
+				      if (!status) return;
+				      activeFilterStatus = (activeFilterStatus === status) ? null : status;
+				      applyStatusFilter(root, activeFilterStatus);
+				    });
+				  });
+				}
+				document.addEventListener("DOMContentLoaded", function () {
+				  initOfflineReport(document.getElementById("result"));
+				});
+				</script>
 				<script>
 				function toggleNlaCard(card) {
 				  const subCards = card.querySelector(':scope > .sub-cards');
@@ -513,16 +626,67 @@ public class AnalysisPageService {
 				  });
 				  initNlaStatusFilter(root);
 				}
+				function saveNlaReportHtml() {
+				  const resultEl = document.getElementById('result');
+				  const offlineTpl = document.getElementById('nla-offline-script');
+				  if (!resultEl || !resultEl.classList.contains('visible') || !resultEl.innerHTML.trim()) {
+				    return;
+				  }
+				  const offlineJs = offlineTpl ? offlineTpl.textContent : '';
+				  const styles = Array.from(document.querySelectorAll('head style'))
+				    .map(function(s) { return s.textContent || ''; })
+				    .join('\\n');
+				  const stamp = new Date();
+				  const pad = function(n) { return String(n).padStart(2, '0'); };
+				  const fileName = 'nla-report-'
+				    + stamp.getFullYear()
+				    + pad(stamp.getMonth() + 1)
+				    + pad(stamp.getDate())
+				    + '-'
+				    + pad(stamp.getHours())
+				    + pad(stamp.getMinutes())
+				    + pad(stamp.getSeconds())
+				    + '.html';
+				  const offlineCss = '\\n.nla-save-btn{display:none!important;}'
+				    + '\\n.metric-detail-card>.sub-card-value{display:block!important;}'
+				    + '\\n.metric-detail-card{cursor:default;}'
+				    + '\\n.nla-modal-overlay{display:none!important;}';
+				  const doc = '<!DOCTYPE html>\\n<html lang="ru">\\n<head>\\n'
+				    + '<meta charset="UTF-8">\\n'
+				    + '<meta name="viewport" content="width=device-width, initial-scale=1">\\n'
+				    + '<title>NLA report</title>\\n<style>\\n'
+				    + styles + offlineCss
+				    + '\\n</style>\\n</head>\\n<body>\\n'
+				    + '<div class="wrap">\\n'
+				    + '  <div class="page-header"><div class="brand">NLA</div></div>\\n'
+				    + '  <div id="result" class="visible">'
+				    + resultEl.innerHTML
+				    + '</div>\\n'
+				    + '</div>\\n'
+				    + '<script>\\n' + offlineJs + '\\n</' + 'script>\\n'
+				    + '</body>\\n</html>\\n';
+				  const blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
+				  const url = URL.createObjectURL(blob);
+				  const a = document.createElement('a');
+				  a.href = url;
+				  a.download = fileName;
+				  document.body.appendChild(a);
+				  a.click();
+				  a.remove();
+				  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+				}
 				document.getElementById('nla-modal-close').addEventListener('click', closeNlaMetricModal);
 				document.getElementById('nla-modal-overlay').addEventListener('click', function(e) {
 				  if (e.target === this) closeNlaMetricModal();
 				});
+				document.getElementById('nla-save-btn').addEventListener('click', saveNlaReportHtml);
 				document.addEventListener('keydown', function(e) {
 				  if (e.key === 'Escape') closeNlaMetricModal();
 				});
 				(async function () {
 				  const statusEl = document.getElementById('status');
 				  const resultEl = document.getElementById('result');
+				  const saveBtn = document.getElementById('nla-save-btn');
 				  try {
 				    const response = await fetch('/analyze/result' + window.location.search, {
 				      headers: { 'Accept': 'text/html' }
@@ -534,6 +698,7 @@ public class AnalysisPageService {
 				    resultEl.innerHTML = html;
 				    statusEl.classList.add('hidden');
 				    resultEl.classList.add('visible');
+				    if (saveBtn) saveBtn.classList.add('visible');
 				    initNlaReportCards(resultEl);
 				  } catch (e) {
 				    statusEl.innerHTML = '<div class="error">Не удалось выполнить анализ: '
