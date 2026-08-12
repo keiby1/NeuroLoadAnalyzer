@@ -19,7 +19,8 @@ public record PluginResult(
 		Double slopePctPerHour,
 		Double deltaAbsBytes,
 		Double deltaPct,
-		String detailBreakdown
+		String detailBreakdown,
+		boolean optional
 ) {
 	public static PluginResult skip(AnalysisPlugin plugin, TypedTarget target, String message) {
 		return base(plugin, target, PluginRunStatus.SKIP, null, null, message, null);
@@ -135,7 +136,8 @@ public record PluginResult(
 				null,
 				null,
 				null,
-				detailBreakdown);
+				detailBreakdown,
+				false);
 	}
 
 	public static PluginResult skipK8s(
@@ -160,7 +162,8 @@ public record PluginResult(
 				null,
 				null,
 				null,
-				null);
+				null,
+				false);
 	}
 
 	public static PluginResult noDataK8s(
@@ -185,7 +188,8 @@ public record PluginResult(
 				null,
 				null,
 				null,
-				null);
+				null,
+				false);
 	}
 
 	public static PluginResult fromSeriesK8s(
@@ -215,7 +219,8 @@ public record PluginResult(
 				verdict.slopePctPerHour(),
 				verdict.deltaAbsBytes(),
 				verdict.deltaPct(),
-				null);
+				null,
+				false);
 	}
 
 	private static PluginResult base(
@@ -243,6 +248,7 @@ public record PluginResult(
 				verdict == null ? null : verdict.slopePctPerHour(),
 				verdict == null ? null : verdict.deltaAbsBytes(),
 				verdict == null ? null : verdict.deltaPct(),
-				null);
+				null,
+				target.optional());
 	}
 }

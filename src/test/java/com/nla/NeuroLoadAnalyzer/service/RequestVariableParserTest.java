@@ -5,8 +5,11 @@ import com.nla.NeuroLoadAnalyzer.dto.TypedTarget;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RequestVariableParserTest {
 
@@ -26,6 +29,41 @@ class RequestVariableParserTest {
 		assertEquals("Kafka", target.software());
 		assertEquals("GW", target.purpose());
 		assertEquals("kafka-01:9100", target.value());
+		assertFalse(target.optional());
+		assertEquals("VM_Kafka_GW", target.canonicalName());
+	}
+
+	@Test
+	void parsesOptionalSuffixCaseInsensitive() {
+		Optional<TypedTarget> opt = parser.parseTypedName("VM_A_B_opt", "host-optional:9100");
+		assertTrue(opt.isPresent());
+		assertEquals("VM", opt.get().type());
+		assertEquals("A", opt.get().software());
+		assertEquals("B", opt.get().purpose());
+		assertTrue(opt.get().optional());
+		assertEquals("VM_A_B_opt", opt.get().rawName());
+		assertEquals("VM_A_B", opt.get().canonicalName());
+
+		assertTrue(parser.parseTypedName("VM_A_B_OPT", "h").map(TypedTarget::optional).orElse(false));
+
+		Optional<TypedTarget> fromVar = parser.extractTypedTargets(
+				List.of(new NamedParameter("var-VM_A_B_opt", "h"))).stream().findFirst();
+		assertTrue(fromVar.isPresent());
+		assertTrue(fromVar.get().optional());
+	}
+
+	@Test
+	void requiredTargetIsNotOptional() {
+		Optional<TypedTarget> t = parser.parseTypedName("VM_A_B", "h");
+		assertTrue(t.isPresent());
+		assertFalse(t.get().optional());
+	}
+
+	@Test
+	void rejectsInvalidOptionalLikeNames() {
+		assertTrue(parser.parseTypedName("VM_A_B_optional", "h").isEmpty());
+		assertTrue(parser.parseTypedName("VM_A_opt", "h").isEmpty());
+		assertTrue(parser.parseTypedName("VM_A_B_opt_extra", "h").isEmpty());
 	}
 
 	@Test

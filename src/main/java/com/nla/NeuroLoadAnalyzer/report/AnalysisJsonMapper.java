@@ -75,7 +75,8 @@ public final class AnalysisJsonMapper {
 		String name = value.parameterValue() != null && !value.parameterValue().isBlank()
 				? value.parameterValue()
 				: value.parameterName();
-		return ReportCardNode.of(name, statusLabel(value.status()), children);
+		Boolean optional = value.optional() ? Boolean.TRUE : null;
+		return ReportCardNode.of(name, statusLabel(value.status()), children, optional);
 	}
 
 	private static ReportCardNode toCheckCard(PluginResult result) {

@@ -11,13 +11,22 @@ import java.util.List;
 public record ReportCardNode(
 		String name,
 		String status,
-		List<ReportCardNode> children
+		List<ReportCardNode> children,
+		@JsonInclude(JsonInclude.Include.NON_NULL) Boolean optional
 ) {
 	public static ReportCardNode of(String name, String status) {
-		return new ReportCardNode(name, status, List.of());
+		return new ReportCardNode(name, status, List.of(), null);
 	}
 
 	public static ReportCardNode of(String name, String status, List<ReportCardNode> children) {
-		return new ReportCardNode(name, status, children == null ? List.of() : List.copyOf(children));
+		return new ReportCardNode(name, status, children == null ? List.of() : List.copyOf(children), null);
+	}
+
+	public static ReportCardNode of(String name, String status, List<ReportCardNode> children, Boolean optional) {
+		return new ReportCardNode(
+				name,
+				status,
+				children == null ? List.of() : List.copyOf(children),
+				optional);
 	}
 }

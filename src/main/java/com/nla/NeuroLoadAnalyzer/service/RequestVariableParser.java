@@ -19,8 +19,10 @@ import java.util.regex.Pattern;
 @Component
 public class RequestVariableParser {
 
+	/** {@code Type_Software_Purpose} with optional {@code _opt} / {@code _OPT} suffix. */
 	private static final Pattern TYPED_NAME = Pattern.compile(
-			"^([A-Za-z0-9]+)_([A-Za-z0-9]+)_([A-Za-z0-9]+)$");
+			"^([A-Za-z0-9]+)_([A-Za-z0-9]+)_([A-Za-z0-9]+)(_opt)?$",
+			Pattern.CASE_INSENSITIVE);
 	private static final String K8S_NAMESPACE_PARAM = "k8s_namespace";
 
 	public List<TypedTarget> extractTypedTargets(List<NamedParameter> parameters) {
@@ -69,16 +71,24 @@ public class RequestVariableParser {
 		if (name == null || name.isBlank()) {
 			return Optional.empty();
 		}
-		Matcher matcher = TYPED_NAME.matcher(name.trim());
+		String trimmed = name.trim();
+		Matcher matcher = TYPED_NAME.matcher(trimmed);
 		if (!matcher.matches()) {
 			return Optional.empty();
 		}
+		boolean optional = matcher.group(4) != null;
+		String purpose = matcher.group(3);
+		// "VM_Kafka_opt" looks like 3 segments with purpose=opt — not a valid typed/optional name.
+		if (!optional && "opt".equalsIgnoreCase(purpose)) {
+			return Optional.empty();
+		}
 		return Optional.of(new TypedTarget(
-				name.trim(),
+				trimmed,
 				matcher.group(1),
 				matcher.group(2),
-				matcher.group(3),
-				value));
+				purpose,
+				value,
+				optional));
 	}
 
 	public static String stripVarPrefix(String name) {

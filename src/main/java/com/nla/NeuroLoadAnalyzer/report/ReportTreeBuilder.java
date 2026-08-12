@@ -29,7 +29,8 @@ public final class ReportTreeBuilder {
 			String type = nullToUnknown(result.targetType());
 			String software = nullToUnknown(result.software());
 			String purpose = nullToUnknown(result.purpose());
-			String valueKey = result.parameterName() + "=" + result.parameterValue();
+			String valueKey = result.parameterName() + "=" + result.parameterValue()
+					+ (result.optional() ? "|opt" : "");
 
 			tree
 					.computeIfAbsent(type, k -> new LinkedHashMap<>())
@@ -50,19 +51,27 @@ public final class ReportTreeBuilder {
 						List<PluginResult> leafResults = List.copyOf(valueEntry.getValue());
 						PluginResult sample = leafResults.get(0);
 						PluginRunStatus valueStatus = StatusAggregator.aggregate(statusesOf(leafResults));
+						boolean optional = leafResults.stream().allMatch(PluginResult::optional);
 						values.add(new ValueReportNode(
 								sample.parameterName(),
 								sample.parameterValue(),
 								valueStatus,
-								leafResults));
+								leafResults,
+								optional));
 					}
-					PluginRunStatus purposeStatus = StatusAggregator.aggregate(values.stream().map(ValueReportNode::status).toList());
+					PluginRunStatus purposeStatus = StatusAggregator.aggregate(
+							values.stream()
+									.filter(v -> !v.optional())
+									.map(ValueReportNode::status)
+									.toList());
 					purposes.add(new PurposeReportNode(purposeEntry.getKey(), purposeStatus, List.copyOf(values)));
 				}
-				PluginRunStatus softStatus = StatusAggregator.aggregate(purposes.stream().map(PurposeReportNode::status).toList());
+				PluginRunStatus softStatus = StatusAggregator.aggregate(
+						purposes.stream().map(PurposeReportNode::status).toList());
 				softwares.add(new SoftwareReportNode(softEntry.getKey(), softStatus, List.copyOf(purposes)));
 			}
-			PluginRunStatus typeStatus = StatusAggregator.aggregate(softwares.stream().map(SoftwareReportNode::status).toList());
+			PluginRunStatus typeStatus = StatusAggregator.aggregate(
+					softwares.stream().map(SoftwareReportNode::status).toList());
 			String typePrefix = typeEntry.getKey();
 			groups.add(new TypeReportGroup(
 					typePrefix,
@@ -107,7 +116,8 @@ public final class ReportTreeBuilder {
 			String parameterName,
 			String parameterValue,
 			PluginRunStatus status,
-			List<PluginResult> results
+			List<PluginResult> results,
+			boolean optional
 	) {
 	}
 }

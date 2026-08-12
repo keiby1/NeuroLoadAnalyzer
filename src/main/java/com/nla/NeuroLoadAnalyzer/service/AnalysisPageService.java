@@ -911,10 +911,14 @@ public class AnalysisPageService {
 
 	private void appendValueCard(StringBuilder html, ValueReportNode value) {
 		String css = StatusAggregator.cssClass(value.status());
+		String displayName = value.parameterValue() == null ? "" : value.parameterValue();
+		if (value.optional()) {
+			displayName = displayName + " (opt)";
+		}
 		html.append("<div class=\"sub-card ").append(css).append(" has-children\">");
 		html.append("<div class=\"sub-card-title\">")
 				.append(indicator(value.status()))
-				.append(esc(value.parameterValue()))
+				.append(esc(displayName))
 				.append(statusLabel(value.status()))
 				.append("</div>");
 		html.append("<div class=\"sub-card-value\">")
