@@ -41,6 +41,13 @@ K8S: `k8sThreshold` / `k8sSeries` + `WorkloadMetric`.
 - **[1m]** — точнее для пиков ~1м (`rate[1m]` → `max_over_time`); всё ещё среднее за минуту, не irate по scrape.
 Имена: VM `CPU max [5m]` / `CPU max [1m]`; K8S `CPU usage [5m]` / `CPU usage [1m]`.
 
+### VM CPU spike + reboot (деструктивные кейсы)
+- **CPU spike [irate]** — `irate(...idle...[2m])` → `max_over_time([$range:15s])`, bands 78/80.
+  Ловит краткие пики, попавшие в scrape (то, что видно на коротком графике и «съедается» при зуме).
+  Не восстанавливает события короче интервала scrape.
+- **Unexpected reboot** — `max(changes(node_boot_time_seconds[$range])) > 0` → FAIL.
+  Ловит ребут в окне теста (в т.ч. после атаки, когда CPU-пик мог не сохраниться).
+
 ### VM RAM usage
 Peak % за from–to (gauge, без `rate`): `max_over_time((100*(1-MemAvailable/MemTotal))[$range:$step])`, bands 78/80.
 Не снимок на `to` — ловит пик за весь интервал.

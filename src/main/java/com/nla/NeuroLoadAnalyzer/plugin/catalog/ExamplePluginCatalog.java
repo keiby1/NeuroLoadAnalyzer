@@ -44,6 +44,23 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 			)
 			""".trim();
 
+	/**
+	 * Point-ish CPU peak: irate (last two scrapes) + max_over_time with 15s subquery step.
+	 * Catches brief spikes visible on short Grafana ranges; cannot invent sub-scrape events.
+	 */
+	private static final String VM_CPU_SPIKE_IRATE = """
+			max_over_time(
+			  (
+			    100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle", instance=~"$VM"}[2m])) * 100)
+			  )[$range:15s]
+			)
+			""".trim();
+
+	/** Reboots during from–to: changes of node_boot_time_seconds. */
+	private static final String VM_UNEXPECTED_REBOOT = """
+			max(changes(node_boot_time_seconds{instance=~"$VM"}[$range])) or vector(0)
+			""".trim();
+
 	/** Peak RAM %% over from–to (gauge, no rate window). */
 	private static final String VM_RAM_MAX = """
 			max_over_time(
@@ -108,6 +125,16 @@ public class ExamplePluginCatalog implements AnalysisPluginCatalog {
 						"VM",
 						VM_CPU_MAX_1M,
 						BandedThresholdCondition.warnThenFail(78, 80)),
+				new AnalysisPlugin(
+						"CPU spike [irate]",
+						"VM",
+						VM_CPU_SPIKE_IRATE,
+						BandedThresholdCondition.warnThenFail(78, 80)),
+				new AnalysisPlugin(
+						"Unexpected reboot",
+						"VM",
+						VM_UNEXPECTED_REBOOT,
+						ThresholdCondition.greaterThan(0)),
 				new AnalysisPlugin(
 						"RAM usage",
 						"VM",
