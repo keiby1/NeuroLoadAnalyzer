@@ -2,6 +2,8 @@
 
 ## Поток
 `GET /analyze` → HTML + spinner → `GET /analyze/result` → парсинг params → плагины → VM → HTML.
+`GET /analyze/json` — те же query-параметры, ответ JSON: `{ status: "<вердикт>", details: [ { name, status, children? }, … ] }`
+(иерархия карточек как в HTML; у листьев только name+status).
 
 ## Вход
 - Обязательны: `from`, `to` (мс, Grafana).

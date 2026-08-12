@@ -70,10 +70,12 @@ AnalysisService             ← оркестрация (пока stub)
 |-------|------|-------|
 | GET | `/analyze` | HTML-оболочка со spinner; JS запрашивает результат |
 | GET | `/analyze/result` | HTML-фрагмент результата анализа |
+| GET | `/analyze/json` | JSON: вердикт + вложенные карточки (`status`, `details`) |
 
 ```http
 GET /analyze?from={ms}&to={ms}&...произвольные параметры...
 GET /analyze/result?from={ms}&to={ms}&...те же параметры...
+GET /analyze/json?from={ms}&to={ms}&...те же параметры...
 ```
 
 | Параметр | Обязательность | Единицы / смысл |

@@ -1,5 +1,6 @@
 package com.nla.NeuroLoadAnalyzer.controller;
 
+import com.nla.NeuroLoadAnalyzer.dto.AnalysisJsonResponse;
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisRequest;
 import com.nla.NeuroLoadAnalyzer.dto.NamedParameter;
 import com.nla.NeuroLoadAnalyzer.service.AnalysisPageService;
@@ -47,6 +48,14 @@ public class AnalysisController {
 		return ResponseEntity.ok()
 				.contentType(MediaType.TEXT_HTML)
 				.body(html);
+	}
+
+	/**
+	 * Same analysis as {@code /analyze/result}, JSON body with verdict and nested cards.
+	 */
+	@GetMapping(value = "/analyze/json", produces = MediaType.APPLICATION_JSON_VALUE)
+	public AnalysisJsonResponse analyzeJson(@RequestParam MultiValueMap<String, String> allParams) {
+		return analysisService.analyzeJson(parseRequest(allParams));
 	}
 
 	private AnalysisRequest parseRequest(MultiValueMap<String, String> allParams) {

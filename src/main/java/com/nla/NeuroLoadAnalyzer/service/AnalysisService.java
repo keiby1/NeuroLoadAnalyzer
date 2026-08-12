@@ -1,6 +1,7 @@
 package com.nla.NeuroLoadAnalyzer.service;
 
 import com.nla.NeuroLoadAnalyzer.config.VictoriaMetricsProperties;
+import com.nla.NeuroLoadAnalyzer.dto.AnalysisJsonResponse;
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisReport;
 import com.nla.NeuroLoadAnalyzer.dto.AnalysisRequest;
 import com.nla.NeuroLoadAnalyzer.dto.K8sNamespaceTarget;
@@ -10,6 +11,7 @@ import com.nla.NeuroLoadAnalyzer.plugin.AnalysisPluginCatalog;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginAnalysisService;
 import com.nla.NeuroLoadAnalyzer.plugin.PluginResult;
 import com.nla.NeuroLoadAnalyzer.plugin.catalog.ExamplePluginCatalog;
+import com.nla.NeuroLoadAnalyzer.report.AnalysisJsonMapper;
 import com.nla.NeuroLoadAnalyzer.report.AnalysisVerdict;
 import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder;
 import com.nla.NeuroLoadAnalyzer.report.ReportTreeBuilder.TypeReportGroup;
@@ -23,7 +25,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Orchestrates request parsing → plugin analysis → HTML report.
+ * Orchestrates request parsing → plugin analysis → HTML / JSON report.
  */
 @Service
 public class AnalysisService {
@@ -50,6 +52,14 @@ public class AnalysisService {
 	}
 
 	public String analyze(AnalysisRequest request) {
+		return analysisPageService.renderReport(buildReport(request));
+	}
+
+	public AnalysisJsonResponse analyzeJson(AnalysisRequest request) {
+		return AnalysisJsonMapper.fromReport(buildReport(request));
+	}
+
+	public AnalysisReport buildReport(AnalysisRequest request) {
 		TimeRange timeRange = TimeRange.of(
 				request.getFromMs(),
 				request.getToMs(),
@@ -72,15 +82,13 @@ public class AnalysisService {
 				typedTargets.size(), k8sNamespaces.size(), pluginResults.size(), typeGroups.size(),
 				verdict, catalogSource);
 
-		AnalysisReport report = new AnalysisReport(
+		return new AnalysisReport(
 				timeRange,
 				typedTargets,
 				pluginResults,
 				typeGroups,
 				verdict,
 				catalogSource);
-
-		return analysisPageService.renderReport(report);
 	}
 
 	private void logIncomingParameters(AnalysisRequest request) {
