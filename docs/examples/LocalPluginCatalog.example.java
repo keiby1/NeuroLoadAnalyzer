@@ -116,6 +116,11 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 			)  → max by deployment → Sen/MK trend (not increasing)
 			""".trim();
 
+	private static final String K8S_MEM_LEAK_DOC = """
+			query_range: container_memory_working_set_bytes{container!="",container!="POD",namespace="$namespace"}
+			  → sum by deployment/statefulset → Sen/MK leak (same thresholds as VM RAM growth / leak)
+			""".trim();
+
 	@Override
 	public List<AnalysisPlugin> getPlugins() {
 		return List.of(
@@ -179,6 +184,12 @@ public class LocalPluginCatalog implements AnalysisPluginCatalog {
 						K8S_MEM_DOC,
 						BandedThresholdCondition.warnThenFail(78, 80),
 						WorkloadMetric.K8S_MEM_MAX_PERCENT),
+				AnalysisPlugin.k8sSeries(
+						"RAM growth / leak",
+						K8S_MEM_LEAK_DOC,
+						TrendLeakCondition.defaults(),
+						WorkloadMetric.K8S_MEM_LEAK_TREND,
+						5),
 				AnalysisPlugin.k8sThreshold(
 						"Container restarts > 0",
 						K8S_RESTART_DOC,

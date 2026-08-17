@@ -56,7 +56,8 @@ Peak % за from–to (gauge, без `rate`): `max_over_time((100*(1-MemAvailabl
 **CPU time above 80%** — доля времени CPU > 80%: ≤1% OK · (1%; 5%] INFO · >5% FAIL.
 
 ### RAM growth / leak
-- PromQL: used bytes (`MemTotal - MemAvailable`), часто с `avg_over_time(...[5m:1m])`.
+- **VM:** used bytes (`MemTotal - MemAvailable`), часто с `avg_over_time(...[5m:1m])`.
+- **K8S:** `query_range` `container_memory_working_set_bytes` → **sum** по контейнерам Deployment/StatefulSet; тот же `TrendLeakCondition`.
 - `query_range` + Sen’s slope / Mann–Kendall, warmup 1ч, min window 4ч.
 - Baseline = медиана первых точек (не первая — меньше ложных WARN от провалов).
 - Пороги (калибровка под 12ч; шум ±0.5 п.п. утилизации хоста → OK):

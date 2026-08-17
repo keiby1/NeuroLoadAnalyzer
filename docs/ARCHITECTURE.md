@@ -178,7 +178,7 @@ Auth **не используется** (доступ во внутренней �
 ### Матчинг и выполнение запросов
 
 Пример: 3 параметра `VM_*` + 3 VM-плагина (CPU, RAM ceiling, RAM leak) → **9** запросов к VictoriaMetrics.
-Для K8S: на каждый `k8s_namespace=…` последовательно — inventory (несколько PromQL), затем пороги CPU/RAM % по каждому workload.
+Для K8S: на каждый `k8s_namespace=…` последовательно — inventory (несколько PromQL), затем пороги CPU/RAM % / throttling / restarts по каждому workload; RANGE — throttling trend и RAM growth / leak (Sen/MK).
 
 Статусы результата:
 

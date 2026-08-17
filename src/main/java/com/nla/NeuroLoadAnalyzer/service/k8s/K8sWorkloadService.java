@@ -171,17 +171,7 @@ public class K8sWorkloadService {
 			if (ck == null) {
 				continue;
 			}
-			String podKey = ck.namespace + "/" + ck.pod;
-			String seriesKey = null;
-			String dep = podToDeployment.get(podKey);
-			if (dep != null) {
-				seriesKey = workloadSeriesKey("Deployment", dep);
-			} else {
-				String sts = podToStatefulSet.get(podKey);
-				if (sts != null) {
-					seriesKey = workloadSeriesKey("StatefulSet", sts);
-				}
-			}
+			String seriesKey = resolveWorkloadSeriesKey(ck, podToDeployment, podToStatefulSet);
 			if (seriesKey == null) {
 				continue;
 			}
@@ -222,6 +212,99 @@ public class K8sWorkloadService {
 		}
 		log.info("K8S namespace='{}': throttling trend series for {} workloads", namespace, out.size());
 		return Map.copyOf(out);
+	}
+
+	/**
+	 * Memory working-set time series per workload (sum across containers at each timestamp), bytes.
+	 * Key: {@link #workloadSeriesKey(String, String)}. Used by RAM growth / leak (Sen/MK).
+	 */
+	public Map<String, List<MetricPoint>> fetchMemoryTrendSeries(
+			String namespace, TimeRange timeRange, int stepMinutes) {
+		if (timeRange == null || timeRange.fromMs() == null || timeRange.toMs() == null
+				|| !timeRange.hasExplicitWindow()) {
+			log.info("K8S memory trend skipped for namespace='{}': need from/to", namespace);
+			return Map.of();
+		}
+		long startSec = timeRange.fromMs() / 1000L;
+		long endSec = timeRange.toMs() / 1000L;
+		long stepSec = Math.max(60L, stepMinutes * 60L);
+		Long evaluationTimeSec = timeRange.evaluationTimeSec();
+
+		Map<String, String> podToDeployment = queryPodToDeployment(namespace, evaluationTimeSec);
+		Map<String, String> podToStatefulSet = queryPodToStatefulSet(namespace, evaluationTimeSec);
+
+		String query = addNamespaceFilter(
+				"container_memory_working_set_bytes{container!=\"\",container!=\"POD\"}",
+				namespace);
+
+		PrometheusResponse resp = client.queryRange(query, startSec, endSec, stepSec);
+		if (resp == null || resp.getData() == null || resp.getData().getResult() == null) {
+			return Map.of();
+		}
+
+		Map<String, TreeMap<Long, Double>> byWorkload = new HashMap<>();
+		for (PrometheusResponse.Result r : resp.getData().getResult()) {
+			ContainerKey ck = containerKeyFromMetric(r.getMetric());
+			if (ck == null) {
+				continue;
+			}
+			String seriesKey = resolveWorkloadSeriesKey(ck, podToDeployment, podToStatefulSet);
+			if (seriesKey == null) {
+				continue;
+			}
+			List<List<Object>> values = r.getValues();
+			if (values == null) {
+				continue;
+			}
+			TreeMap<Long, Double> series = byWorkload.computeIfAbsent(seriesKey, k -> new TreeMap<>());
+			for (List<Object> pair : values) {
+				if (pair == null || pair.size() < 2 || pair.get(0) == null || pair.get(1) == null) {
+					continue;
+				}
+				long ts;
+				try {
+					ts = (long) Double.parseDouble(pair.get(0).toString());
+				} catch (NumberFormatException e) {
+					continue;
+				}
+				double v;
+				try {
+					v = Double.parseDouble(pair.get(1).toString());
+				} catch (NumberFormatException e) {
+					continue;
+				}
+				if (!Double.isFinite(v) || v < 0) {
+					continue;
+				}
+				series.merge(ts, v, Double::sum);
+			}
+		}
+
+		Map<String, List<MetricPoint>> out = new HashMap<>();
+		for (Map.Entry<String, TreeMap<Long, Double>> e : byWorkload.entrySet()) {
+			List<MetricPoint> points = e.getValue().entrySet().stream()
+					.map(p -> new MetricPoint(p.getKey(), p.getValue()))
+					.toList();
+			out.put(e.getKey(), points);
+		}
+		log.info("K8S namespace='{}': memory trend series for {} workloads", namespace, out.size());
+		return Map.copyOf(out);
+	}
+
+	private String resolveWorkloadSeriesKey(
+			ContainerKey ck,
+			Map<String, String> podToDeployment,
+			Map<String, String> podToStatefulSet) {
+		String podKey = ck.namespace + "/" + ck.pod;
+		String dep = podToDeployment.get(podKey);
+		if (dep != null) {
+			return workloadSeriesKey("Deployment", dep);
+		}
+		String sts = podToStatefulSet.get(podKey);
+		if (sts != null) {
+			return workloadSeriesKey("StatefulSet", sts);
+		}
+		return null;
 	}
 
 	public static String workloadSeriesKey(String workloadType, String name) {

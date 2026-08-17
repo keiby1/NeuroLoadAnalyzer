@@ -110,8 +110,11 @@ public class PluginAnalysisService {
 		List<PluginResult> results = new ArrayList<>();
 		boolean needThrottlingTrend = k8sPlugins.stream()
 				.anyMatch(p -> p.workloadMetric() == WorkloadMetric.K8S_THROTTLING_TREND);
+		boolean needMemLeakTrend = k8sPlugins.stream()
+				.anyMatch(p -> p.workloadMetric() == WorkloadMetric.K8S_MEM_LEAK_TREND);
 		int trendStepMinutes = k8sPlugins.stream()
-				.filter(p -> p.workloadMetric() == WorkloadMetric.K8S_THROTTLING_TREND)
+				.filter(p -> p.workloadMetric() == WorkloadMetric.K8S_THROTTLING_TREND
+						|| p.workloadMetric() == WorkloadMetric.K8S_MEM_LEAK_TREND)
 				.mapToInt(AnalysisPlugin::stepMinutes)
 				.min()
 				.orElse(5);
@@ -121,6 +124,10 @@ public class PluginAnalysisService {
 				List<K8sWorkload> workloads = k8sWorkloadService.fetchWorkloads(nsTarget.namespace(), timeRange);
 				Map<String, List<MetricPoint>> throttlingTrends = needThrottlingTrend
 						? k8sWorkloadService.fetchThrottlingTrendSeries(
+						nsTarget.namespace(), timeRange, trendStepMinutes)
+						: Map.of();
+				Map<String, List<MetricPoint>> memoryTrends = needMemLeakTrend
+						? k8sWorkloadService.fetchMemoryTrendSeries(
 						nsTarget.namespace(), timeRange, trendStepMinutes)
 						: Map.of();
 				if (workloads.isEmpty()) {
@@ -134,8 +141,13 @@ public class PluginAnalysisService {
 				for (K8sWorkload workload : workloads) {
 					for (AnalysisPlugin plugin : k8sPlugins) {
 						if (plugin.workloadMetric() == WorkloadMetric.K8S_THROTTLING_TREND) {
-							results.add(evaluateK8sThrottlingTrend(
-									plugin, workload, timeRange, throttlingTrends));
+							results.add(evaluateK8sSeriesTrend(
+									plugin, workload, timeRange, throttlingTrends,
+									"Для анализа тренда троттлинга нужны from/to во входном запросе"));
+						} else if (plugin.workloadMetric() == WorkloadMetric.K8S_MEM_LEAK_TREND) {
+							results.add(evaluateK8sSeriesTrend(
+									plugin, workload, timeRange, memoryTrends,
+									"Для анализа утечки RAM нужны from/to во входном запросе"));
 						} else {
 							results.add(evaluateK8sPlugin(plugin, workload, timeRange));
 						}
@@ -160,24 +172,24 @@ public class PluginAnalysisService {
 		return results;
 	}
 
-	private PluginResult evaluateK8sThrottlingTrend(
+	private PluginResult evaluateK8sSeriesTrend(
 			AnalysisPlugin plugin,
 			K8sWorkload workload,
 			TimeRange timeRange,
-			Map<String, List<MetricPoint>> throttlingTrends) {
+			Map<String, List<MetricPoint>> seriesByWorkload,
+			String missingWindowMessage) {
 		String queryDoc = plugin.promQlTemplate()
 				.replace("$namespace", workload.namespace())
 				.replace("$deployment", workload.name())
 				.replace("$range", timeRange.rangeForPromQl());
 		if (timeRange.fromMs() == null || timeRange.toMs() == null || !timeRange.hasExplicitWindow()) {
-			return PluginResult.skipK8s(plugin, workload.namespace(), workload.name(),
-					"Для анализа тренда троттлинга нужны from/to во входном запросе");
+			return PluginResult.skipK8s(plugin, workload.namespace(), workload.name(), missingWindowMessage);
 		}
 		String key = K8sWorkloadService.workloadSeriesKey(workload.workloadType(), workload.name());
-		List<MetricPoint> series = throttlingTrends.getOrDefault(key, List.of());
+		List<MetricPoint> series = seriesByWorkload.getOrDefault(key, List.of());
 		if (series.isEmpty()) {
-			log.info("K8S throttling trend: no series for ns={}, workload={}",
-					workload.namespace(), workload.name());
+			log.info("K8S series trend: no series for rule='{}', ns={}, workload={}",
+					plugin.name(), workload.namespace(), workload.name());
 			return PluginResult.noDataK8s(plugin, workload.namespace(), workload.name(), queryDoc);
 		}
 		SeriesVerdict verdict = plugin.seriesCondition().evaluate(series);
